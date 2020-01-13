@@ -18,8 +18,6 @@ This script reads in data from A2 study and new data acquired at Bangor, and per
 ########### Set toggles before running! ################################################################
 
 # These toggles determine the parameters used in the analysis
-RHonly            <- 0 # Set to 0 if want to include both R and L handers. 
-                        # Set to -1 for just L handers. MANUSCRIPT SETTING = 0
 Fonly             <- 0 # Set to 1 for females only. MANUSCRIPT SETTING = 0
 Init30only        <- 0 # Set to 1 to include just the initial preregistered group (23 R and 7 L hander). MANUSCRIPT SETTING = 0
 tryreorder        <- 1 # Set to 1 to change the fixed path in the SEM model. MANUSCRIPT SETTING = 1
@@ -75,18 +73,6 @@ particdat$study <- c(rep('A2', length(particdat_A2$ID)), rep('Bangor', length(pa
 if (Init30only==1) {
   print('First 30 subjects only included in analysis')
   particdat<-particdat[1:30,]
-}
-
-# RHonly: only right handed participants
-if (RHonly==1){ 
-  print('R handers only included in analysis')
-  particdat <- filter(particdat,handedness=='R')
-}
-
-# RHonly = -1: only left handed participants
-if (RHonly== -1){ 
-  print('L handers only included in analysis')
-  particdat <- filter(particdat,handedness=='L')
 }
 
 # Fonly: only female participants
@@ -257,13 +243,12 @@ age_info <- particdat %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m
 age_by_study <- particdat %>% group_by(study) %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
 
 # Do left / right handed participants differ in gender?
-if (RHonly == 0){
 chisq.test(gender_table)
 age_by_handedness <- particdat %>% group_by(handedness) %>% 
   summarise(age_mean = mean(Age_m)/12, age_sd =sd(Age_m)/12)
 # Do left / right participants differ in age
 t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)])
-}
+
 print(age_info)
 
 ```
@@ -302,7 +287,6 @@ print('Omit')
 stargazer(behavdat[,omit.cols],type='text')
 nevents <- c(15,90,90,15,90,45,15,90,90,15,90,45) # The number of events in each condition
 
-if (RHonly == 0){
 # Do left and right handers show different levels of task performance?
 cols_to_test <- c(word.cols, acc.cols, rt.cols)
 behav_tests <- data.frame(
@@ -329,7 +313,7 @@ if (length(which(behav_tests$p < corrected_alpha)) == 0){
   print(paste0('No significant difference between left and right handers observed for number of words, RT or Accuracy on any task'))
   print(paste0('p > ', round(min(behav_tests$p), 4), ' in all cases.'))
 }
-}
+
 ```
 
 ## Calculate means of LI values, check normality and create pirate plot
@@ -951,6 +935,7 @@ for (i in 1:length(RH_row)){
 }
 #check for bivariate outliers
 facmod_RH <- lm(alltask$f1score[RH_row] ~ alltask$f2score[RH_row])
+alltask$cookdist <- 0
 alltask$cookdist[RH_row] <- cooks.distance(facmod_RH)
 
 #=================================================================================#
@@ -989,7 +974,6 @@ for (i in 1:length(LH_row)){
 #check for bivariate outliers
 facmod_LH <- lm(alltask$f1score[LH_row] ~ alltask$f2score[LH_row])
 alltask$cookdist[LH_row] <- cooks.distance(facmod_LH)
-
 
 
 plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = 'Cooks Distance', xlab = 'Participant')
@@ -1063,46 +1047,52 @@ Jacknife estimates considered for model SEs, which can be compared with standard
 
 ```{r exploratory}
 #exploring various links with handedness
-if(RHonly==0){
-  # Calculate difference between SentGen minus ListGen (averaged over both sessions)
-  mydiff<-(alltaskall$SentGen1+alltaskall$SentGen2)/2-(alltaskall$ListGen1+alltaskall$ListGen2)/2
-  # Does this difference vary with handedness?
-  t.test(mydiff~particdat$handcode)
-  plot(mydiff~particdat$handcode)
-  
-  # Which other tasks vary with handedness?
-  senttot<-(alltaskall$SentGen1+alltaskall$SentGen2)/2
-  listtot<-(alltaskall$ListGen1+alltaskall$ListGen2)/2
-  semtot<-(alltaskall$SemDec1+alltaskall$SemDec2)/2
-  phontot<-(alltaskall$PhonDec1+alltaskall$PhonDec2)/2
-  comptot<-(alltaskall$SentComp1+alltaskall$SentComp2)/2
-  jabbertot<-(alltaskall$Jabber1+alltaskall$Jabber2)/2
-  t.test(senttot~particdat$handcode)
-  plot(senttot~particdat$handcode)
-  t.test(listtot~particdat$handcode)
-  plot(listtot~particdat$handcode)
-  t.test(semtot~particdat$handcode)
-  plot(semtot~particdat$handcode)
-  t.test(phontot~particdat$handcode)
-  plot(phontot~particdat$handcode)
-  t.test(comptot~particdat$handcode)
-  plot(comptot~particdat$handcode)
-  t.test(jabbertot~particdat$handcode)
-  plot(jabbertot~particdat$handcode)
-  
-  # Do factor scores vary with handedness?
-  t.test(alltask$f1score~particdat$handcode)
-  t.test(alltask$f2score~particdat$handcode)
-  
-  # Count how many tasks a subject is left lateralised for
-  for (i in 1:nrow(alltask)){
-    alltask$Nleftlat[i]<-length(which(c(listtot[i],phontot[i],semtot[i],senttot[i],comptot[i],
-                                        jabbertot[i])>0))
-  }
-  
-  # Does the number of left lateralised tasks per participant vary with handedness?
-  table(alltask$Nleftlat,particdat$handcode)
-  t.test(alltask$Nleftlat,particdat$handcode)
+
+# Calculate difference between SentGen minus ListGen (averaged over both sessions)
+mydiff<-(alltaskall$SentGen1+alltaskall$SentGen2)/2-(alltaskall$ListGen1+alltaskall$ListGen2)/2
+
+# Does this difference vary with handedness?
+t.test(mydiff~particdat$handcode)
+plot(mydiff~particdat$handcode)
+
+# Which other tasks vary with handedness?
+taskA_LG<-(alltaskall$ListGen1+alltaskall$ListGen2)/2
+t.test(taskA_LG~particdat$handcode)
+plot(taskA_LG~particdat$handcode)
+
+taskB_PD<-(alltaskall$PhonDec1+alltaskall$PhonDec2)/2
+t.test(taskB_PD~particdat$handcode)
+plot(taskB_PD~particdat$handcode)
+
+taskC_SD<-(alltaskall$SemDec1+alltaskall$SemDec2)/2
+t.test(taskC_SD~particdat$handcode)
+plot(taskC_SD~particdat$handcode)
+
+taskD_SG<-(alltaskall$SentGen1+alltaskall$SentGen2)/2
+t.test(taskD_SG~particdat$handcode)
+plot(taskD_SG~particdat$handcode)
+
+taskE_SC<-(alltaskall$SentComp1+alltaskall$SentComp2)/2
+t.test(taskE_SC~particdat$handcode)
+plot(taskE_SC~particdat$handcode)
+
+taskF_JD<-(alltaskall$Jabber1+alltaskall$Jabber2)/2
+t.test(taskF_JD~particdat$handcode)
+plot(taskF_JD~particdat$handcode)
+
+# Do factor scores vary with handedness?
+t.test(alltask$f1score~particdat$handcode)
+t.test(alltask$f2score~particdat$handcode)
+
+# Count how many tasks a subject is left lateralised for
+for (i in 1:nrow(alltask)){
+  alltask$Nleftlat[i]<-length(which(c(taskA_LG[i], taskB_PD[i], taskC_SD[i],
+                                      taskD_SG[i], taskE_SC[i], taskF_JD[i])>0))
+}
+
+# Does the number of left lateralised tasks per participant vary with handedness?
+table(alltask$Nleftlat,particdat$handcode)
+t.test(alltask$Nleftlat,particdat$handcode)
   
   # # Not sure what this is doing....
   # alltask$handcode<-particdat$handcode
@@ -1114,7 +1104,7 @@ if(RHonly==0){
   # w<-c(which(alltaskhand$Nleftlat==6),which(alltaskhand$Nleftlat==0))
   # alltaskhand$consistent[w]<-1
 
-}
+
 ```
 
 
