@@ -10,7 +10,19 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Introduction
-This script reads in data from A2 study and new data acquired at Bangor, and performs the analyses reported in the Laterality paper.
+This script reads in data from A2 study (from dropbox) and new data acquired at Bangor (stored locally), and performs basic summary statistics followed by SEM analysis of the laterality indices.
+
+*Before you start*
+The following files need to downloaded from OSF (https://osf.io/qetj5/files/) and saved to the working directory:
+
+*A2_Participant_Info_Bangor.csv
+*Bangor_Results_Session1.csv
+*Bangor_Results_Session2.csv
+*A2_Behavioural_Data_Bangor.csv
+The following script needs to be pulled from github:
+*geom_pirate_ZW.R
+The following package needs to be installed manually:
+*devtools::install_github("mikabr/ggpirate")
 
 ## Set variables and load packages
 
@@ -84,6 +96,10 @@ if (Fonly== 1){
 ```
 
 ## Read in LI data, drop those with insufficient number of good trials
+
+During the fTCD data collection, noise may occur due to movement or interference affecting the ultrasound probes. Trials with excessive noise have been manually identified and excluded from analysis. Trials may also have been excluded if the participant failed to perform the task correctly.
+There are 15 trials per task (in each session). If a participant has less than 10 'good' (included) trials for a particular task, their data for that task will be excluded from the analysis.
+If a participant has missing data for more than one task, that participant will be excluded from the analysis entirely.
 
 ```{r readdata, warning=FALSE}
 #read in data from sessions 1 and 2, having saved as .csv
@@ -171,6 +187,10 @@ data2 <- data2[-which(data2$Filename %in% drop_subj), ]
 
 ## Identifying exclusions and substituting NA based on SE
 
+After dropping tasks and subjects due to missing data (above), we now look at the standard error of the trial by trial data for each subject. If a subject has unusually high standard error for a particular task (using the Hoaglin Iglewicz criterion), their data for that task will be excluded.
+Again, if a participant has excluded data for more than one task, all of the data for that participant will be excluded from the analysis.
+
+
 ```{r exclude, warning=FALSE}
 allse <- cbind(dplyr::select(data1,A1.mean_se,B1.mean_se,C1.mean_se,D1.mean_se,E1.mean_se,F1.mean_se),
                dplyr::select(data2,A2.mean_se,B2.mean_se,C2.mean_se,D2.mean_se,E2.mean_se,F2.mean_se))
@@ -228,6 +248,9 @@ if (length(drop_subj_outliers) > 0){
 nsubj_final <- dim(data1)[1]
 ```
 
+## Report demographic summary statistics for all INCLUDED participants
+I.e omitting participants who have been excluded from the analysis as described above.
+
 ```{r demographics}
 #Participant descriptors reported in paper
 gender_info <- particdat %>% group_by(Gender) %>% summarise(n=n())
@@ -254,6 +277,10 @@ print(age_info)
 ```
 
 ## Read in and analyse task behavioural data
+
+Behavioural task data includes responses the participants made during the task, i.e. reaction times and accuracy for decision tasks, or the number of words produced for speech generation tasks.
+
+The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
 
 ```{r behaviouraldata}
 behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
@@ -318,6 +345,9 @@ if (length(which(behav_tests$p < corrected_alpha)) == 0){
 
 ## Calculate means of LI values, check normality and create pirate plot
 
+The fTCD data is analysed (in another script) to produce laterality indices (LI values) for each task in each session. The LI values are used subsequently in the SEM analysis.
+
+The following chunk reports summary statistics and produces a plot of the LI values.
 
 ```{r LI_means, warning=FALSE}
 # Modified script for ggpirate plot
