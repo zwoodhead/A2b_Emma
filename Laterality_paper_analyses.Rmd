@@ -285,6 +285,10 @@ print(age_info)
 
 ## Read in and analyse task behavioural data
 
+Behavioural task data includes responses the participants made during the task, i.e. reaction times and accuracy for decision tasks, or the number of words produced for speech generation tasks.
+
+The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
+
 ```{r behaviouraldata}
 behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
 behavdat_Bangor <- read.csv('A2_Behavioural_Data_Bangor.csv') # this file is renamed; was A2_Results_Bangor.xlsx
@@ -348,6 +352,9 @@ if (length(which(behav_tests$p < corrected_alpha)) == 0){
 
 ## Calculate means of LI values, check normality and create pirate plot
 
+The fTCD data is analysed (in another script) to produce laterality indices (LI values) for each task in each session. The LI values are used subsequently in the SEM analysis.
+
+The following chunk reports summary statistics and produces a plot of the LI values.
 
 ```{r LI_means, warning=FALSE}
 # Modified script for ggpirate plot
@@ -502,6 +509,8 @@ ggsave(filename = 'My_pirate.png', plot = my_pirate, width = 8, height = 4)
 ```
 
 ## Correlation matrix
+
+
 
 ```{r corrheat}
 ilist <- c(1,7,2,8,3,9,4,10,5,11,6,12)
