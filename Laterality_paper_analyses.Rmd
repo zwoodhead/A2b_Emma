@@ -505,7 +505,9 @@ ggsave(filename = 'My_pirate.png', plot = my_pirate, width = 8, height = 4)
 
 ## Correlation matrix
 
+
 ```{r corrheat,fig.height=6,figwidth=10}
+
 ilist <- c(1,7,2,8,3,9,4,10,5,11,6,12)
 both_cormats <- data.frame(matrix(data=NA, nrow=1, ncol=4))
 colnames(both_cormats) <- c('Var1','Var2','cor','Hand')
