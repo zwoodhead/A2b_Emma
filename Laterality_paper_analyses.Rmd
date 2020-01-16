@@ -842,91 +842,6 @@ Conclusion: For the 2 factor model, the unconstrained model IS significantly bet
 
 The remaining analyses will focus on the model with the strongest evidence: 2 factor model where factor loadings could differ between left and right handed groups (unconstrained)
 
-<!--
-```{r FactorPlots}
-#=================================================================================#
-# Select Factor 1 loadings for plotting 
-# The parameters are from the multigroup model, but the separate model ones are the same)
-# The right handed group comes first
-winning_summary <- summary(Model2_unc_mg)
-
-real_est_path <- winning_summary$parameters$Estimate
-real_est_se <- winning_summary$parameters$Std.Error
-mylowCI <- real_est_path - 1.96*real_est_se
-myhighCI <- real_est_path + 1.96*real_est_se
-
-# NB: In this data, the rows are as follows:
-# 1-5:    Factor 1 loadings, RH
-# 6-10:   Factor 2 loadings, RH
-# 11-16:  Residual variances, RH
-# 17:     Factor 1 variance, RH
-# 18-23:  Means, RH
-
-# 24-28:  Factor 1 loadings, LH
-# 29-33:   Factor 2 loadings, LH
-# 34-39:  Residual variances, LH
-# 40:     Factor 1 variance, LH
-# 41-46:  Means, LH
-
-# Bear in mind that if you change the winning model, the indices below will also need to change!!
-
-Factor1_plot_data = data.frame(
-  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
-  'Group' = rep(c('Left Handed', 'Right Handed'), each = 6), # Left handers first to make the plot work
-  'Loading' = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
-                real_est_path[1:3],1,real_est_path[4:5]),    # Factor 1 loadings, RH
-  'lowCI' = c(mylowCI[24:26],1,mylowCI[27:28],               # Factor 1 low CI, LH
-              mylowCI[1:3],1,mylowCI[4:5]),                  # Factor 1 low CI, RH
-  'highCI' = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
-               myhighCI[1:3],1,myhighCI[4:5])                # Factor 1 high CI, RH
-)
-Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
-Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
-
-#=================================================================================#
-# Plot Factor 1 loadings
-my_factor1 <- ggplot(Factor1_plot_data, aes(x = Task, y = Loading, fill = Task)) +
-  geom_boxplot(lower = Factor1_plot_data$lowCI, upper = Factor1_plot_data$highCI) +
-  ylim(-1,2) +
-  theme_bw() +
-  geom_hline(yintercept = 0) +
-  ylab('Factor 1 Loadings') +
-  facet_grid(.~Group)+theme(legend.position ='none')
-
-print(my_factor1)
-ggsave(filename = 'My_factor1.png', dpi=300, plot = my_factor1, width = 6, height = 2.5)  
-
-#=================================================================================#
-# Select Factor 2 loadings for plotting
-Factor2_plot_data = data.frame(
-  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
-  'Group' = rep(c('Left Handed','Right Handed'), each = 6),
-  'Loading' = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
-                real_est_path[6:8],0,real_est_path[9:10]), # Right Handers factor 1 loadings
-  'lowCI' = c(mylowCI[29:31],0,mylowCI[32:33], # Left Handers factor1 low CI
-              mylowCI[6:8],0,mylowCI[9:10]), # Right Handers factor1 low CI
-  'highCI' = c(myhighCI[29:31],0,myhighCI[32:33],
-               myhighCI[6:8],0,myhighCI[9:10])
-)
-
-Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
-Factor2_plot_data$Group <- factor(Factor2_plot_data$Group)
-
-#=================================================================================#
-# Plot Factor 2 loadings
-my_factor2 <- ggplot(Factor2_plot_data, aes(x = Task, y = Loading, fill = Task)) +
-  geom_boxplot(lower = Factor2_plot_data$lowCI, upper = Factor2_plot_data$highCI) +
-  ylim(-1,2) +
-  theme_bw() +
-  geom_hline(yintercept = 0) +
-  ylab('Factor 2 Loadings') +
-  facet_grid(.~Group) + theme(legend.position='none')
-
-print(my_factor2)
-ggsave(filename = 'My_factor2.png', dpi=300, plot = my_factor2, width = 6, height = 2.5) 
-```
--->
-
 ```{r FactorPlots2,fig.width=10,fig.height=10,echo=TRUE}
 #=================================================================================#
 # Select Factor 1 loadings for plotting 
@@ -967,18 +882,6 @@ Factor1_plot_data = data.frame(
 Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
 Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
 Factor1_plot_data$Factor<-rep('Factor 1',length(Factor1_plot_data[,1]))
-#=================================================================================#
-# Plot Factor 1 loadings
-# my_factor1 <- ggplot(Factor1_plot_data, aes(x = Task, y = Loading, fill = Task)) +
-#   geom_boxplot(lower = Factor1_plot_data$lowCI, upper = Factor1_plot_data$highCI) +
-#   ylim(-1,2) +
-#   theme_bw() +
-#   geom_hline(yintercept = 0) +
-#   ylab('Factor 1 Loadings') +
-#   facet_grid(.~Group)+theme(legend.position ='none')
-# 
-# print(my_factor1)
-# ggsave(filename = 'My_factor1.png', dpi=300, plot = my_factor1, width = 6, height = 2.5)  
 
 #=================================================================================#
 # Select Factor 2 loadings for plotting
@@ -1010,7 +913,7 @@ my_factor_both <- ggplot(Factor_plot_data, aes(x = Task, y = Loading, fill = Tas
   facet_grid(Factor~Group) + theme(legend.position='none')
 
 print(my_factor_both)
-#ggsave(filename = 'My_factorboth.png', dpi=300, plot = my_factor2, width = 6, height = 2.5) 
+ggsave(filename = 'My_factors.png', dpi=300, plot = my_factor_both, width = 6, height = 5) 
 ```
 
 
