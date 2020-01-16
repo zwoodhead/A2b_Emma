@@ -1,0 +1,1259 @@
+---
+title: "Laterality_Paper"
+author: "Zoe Woodhead"
+date: "20/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+This script reads in data from A2 study and new data acquired at Bangor, and performs the analyses reported in the Laterality paper.
+
+## Set variables and load packages
+
+```{r settings, warning=FALSE, message=FALSE}
+########### Set toggles before running! ################################################################
+
+# These toggles determine the parameters used in the analysis
+Fonly             <- 0 # Set to 1 for females only. MANUSCRIPT SETTING = 0
+Init30only        <- 0 # Set to 1 to include just the initial preregistered group (23 R and 7 L hander). MANUSCRIPT SETTING = 0
+tryreorder        <- 1 # Set to 1 to change the fixed path in the SEM model. MANUSCRIPT SETTING = 1
+nuorder           <-   # Sets the new order of tasks. The task listed first (and seventh) will be fixed.
+ c(4,1,2,3,5,6,10,7,8,9,11,12) # Sentence generation fixed. MANUSCRIPT SETTING: c(4,1,2,3,5,6,10,7,8,9,11,12)
+remove.Ntrial     <- 1 # Set to 1 to run exclusion of those with < 12 good trials. MANUSCRIPT SETTING = 1
+
+########################################################################################################
+
+#Needs OpenMx, which you get with following command (not CRAN)
+#source('https://openmx.ssri.psu.edu/software/getOpenMx.R')
+require(tidyverse)
+require(OpenMx)
+require(umx)
+require(stargazer) #simple commands for nice tables
+require(semTools) #for fit measures
+#library(DiagrammeR) #for the diagram
+require(stringr)
+require(data.table)
+library('devtools')
+library("reshape2")
+library("yarrr")
+#library(DiagrammeRsvg)
+library(magrittr)
+library(svglite)
+library(rsvg)
+library(knitr)
+library(dmm) #added for 'unfactor' command : nb this messes up some dplyr commands, need to specify dplyr explicitly, e.g. dplyr::select for 'select' command.
+# On first use, please also install ggpirate as follows:
+# devtools::install_github("mikabr/ggpirate")
+library(ggpirate)
+
+```
+
+## Read in list of participants, drop those with incomplete data
+
+```{r participants}
+particdat_A2    <- read.csv('https://osf.io/5jt6q/download')
+particdat_Bangor<- read.csv('A2_Participant_Info_Bangor.csv',header=TRUE) 
+
+# Merge both datasets
+particdat <- rbind(particdat_A2[,c(1:4)], particdat_Bangor[,c(1:4)])
+rhanded <- which(particdat$handedness == 'R')
+
+# Create variable 'handcode', needed when numeric value used for colour in plots
+particdat$handcode <- 2
+particdat$handcode[rhanded] <- 1
+
+# Create variable 'study', according to whether the data was acquired in A2 study or in Bangor
+particdat$study <- c(rep('A2', length(particdat_A2$ID)), rep('Bangor', length(particdat_Bangor$ID)))
+
+# Init30only: original sample from prereg analysis
+if (Init30only==1) {
+  cat('First 30 subjects only included in analysis')
+  particdat<-particdat[1:30,]
+}
+
+# Fonly: only female participants
+if (Fonly== 1){
+  cat('Females only included in analysis')
+  particdat <- filter(particdat,Gender=='F')
+}
+
+```
+
+## Read in LI data, drop those with insufficient number of good trials
+
+```{r readdata, warning=FALSE}
+#read in data from sessions 1 and 2, having saved as .csv
+#NB. Need to set working directory to location of data files - or else specify path
+data1_A2 <- read.csv('https://osf.io/afv4h/download')
+data2_A2 <- read.csv('https://osf.io/hzswc/download')
+
+data1_Bangor <- read.csv('Bangor_Results_Session1.csv',stringsAsFactors=FALSE) #changed from read.csv to avoid creating factors!
+data2_Bangor <- read.csv('Bangor_Results_Session2.csv',stringsAsFactors=FALSE)
+
+data1 <- rbind(data1_A2, data1_Bangor)
+data2 <- rbind(data2_A2, data2_Bangor)
+
+# Only take the participants included in particdat (allows you to drop subjects by handedness)
+data1 <- data1[which(data1$Filename %in% particdat$ID), ] 
+data2 <- data2[which(data2$Filename %in% particdat$ID), ] 
+
+# Combine all LI data
+alltask <- cbind(dplyr::select(data1, A1.LI_mean, B1.LI_mean, C1.LI_mean, D1.LI_mean, E1.LI_mean, F1.LI_mean),
+                 dplyr::select(data2, A2.LI_mean, B2.LI_mean, C2.LI_mean, D2.LI_mean, E2.LI_mean, F2.LI_mean))
+
+#next loop added as R seems to think everything is a character
+for (v in 1:ncol(alltask)){
+  alltask[,v]<-as.numeric(alltask[,v])
+}
+
+mylabels<-c('ListGen1','PhonDec1','SemDec1','SentGen1','SentComp1','Jabber1',
+            'ListGen2','PhonDec2','SemDec2','SentGen2','SentComp2','Jabber2')
+myshortlab<-c('ListGen','PhonDec','SemDec','SentGen','SentComp','Jabber')
+mylonglab <-c('List Generation','Phonological Decision','Semantic Decision',
+              'Sentence Generation','Sentence Comprehension','Syntactic Decision')
+
+colnames(alltask)<-mylabels
+
+# Create a new copy where the outliers will be retained
+alltaskall <- alltask
+
+# Identify datapoints with less than 10 useable trials to be excluded
+dropN<-0 #initialise counter
+
+nbit<-c('A1.N','B1.N','C1.N','D1.N','E1.N','F1.N')
+for (i in 1:6){
+  w<-which(colnames(data1) == nbit[i])
+  ww<-which(as.numeric(data1[ ,w]) < 10)
+  if(length(ww) > 0){
+    alltask[ww,i] <- NA
+    dropN <- dropN + length(ww)
+  }
+}
+
+nbit<-c('A2.N','B2.N','C2.N','D2.N','E2.N','F2.N')
+for (i in 1:6){
+  w <- which(colnames(data2) == nbit[i])
+  ww <- which(as.numeric(data2[ ,w]) < 10)
+  if(length(ww) > 0){
+    alltask[ww,(i+6)] <- NA
+    dropN <- dropN + length(ww)
+  }
+}
+cat(paste('Dropped datapoints because < 10 trials, N = ',dropN))
+
+subj_inclusion <- data.frame(
+  'ID' = data1$Filename,
+  'include' = rep(1, length(data1$Filename))
+)
+
+for (i in 1:length(data1$Filename)){
+  count_NAs <- length(which(is.na(alltask[i, ])))
+  if (count_NAs > 1) { subj_inclusion$include[i] <- 0}
+}
+
+drop_subj <- subj_inclusion$ID[which(subj_inclusion$include == 0)]
+
+cat(paste('Dropped subjects because > 2 missing or dropped datapoints, N = ', length(drop_subj)))
+cat(drop_subj)
+
+# Remove these subjects from particdat, data1, data2, alltask and alltaskall
+particdat <- particdat[-which(particdat$ID %in% drop_subj), ] 
+alltask <- alltask[-which(data1$Filename %in% drop_subj), ]
+alltaskall <- alltaskall[-which(data1$Filename %in% drop_subj), ]
+data1 <- data1[-which(data1$Filename %in% drop_subj), ]
+data2 <- data2[-which(data2$Filename %in% drop_subj), ]
+
+```
+
+## Identifying exclusions and substituting NA based on SE
+
+```{r exclude, warning=FALSE}
+allse <- cbind(dplyr::select(data1,A1.mean_se,B1.mean_se,C1.mean_se,D1.mean_se,E1.mean_se,F1.mean_se),
+               dplyr::select(data2,A2.mean_se,B2.mean_se,C2.mean_se,D2.mean_se,E2.mean_se,F2.mean_se))
+
+#next loop added as R seems to think everything is a character
+for (v in 1:ncol(allse)){
+  allse[,v]<-as.numeric(allse[,v])
+}
+
+myse<-c(allse[,1], allse[,2], allse[,3], allse[,4], allse[,5],allse[,6],
+        allse[,7], allse[,8], allse[,9], allse[,10], allse[,11], allse[,12])
+        
+Q3<-quantile(myse,.75,na.rm=TRUE)
+Q1<-quantile(myse,.25,na.rm=TRUE)
+Qlimit<-Q3+2.2*(Q3-Q1)
+
+dropSE<-0 #initialise counter
+
+for (i in 1:12){
+  w <- which(allse[,i]>Qlimit)
+  if (length(w)>0){
+    alltask[w,i]<-NA
+    dropSE <- dropSE + length(w)
+  }
+}
+
+cat(paste('Dropped datapoints because high SE, N = ',dropSE))
+
+# Drop participants if two or more datapoints are dropped as outliers
+subj_inclusion_outliers <- data.frame(
+  'ID' = data1$Filename,
+  'include' = rep(1, length(data1$Filename))
+)
+
+for (i in 1:length(data1$Filename)){
+  count_NAs <- length(which(is.na(alltask[i, ])))
+  if (count_NAs > 1) { subj_inclusion_outliers$include[i] <- 0}
+}
+
+drop_subj_outliers <- subj_inclusion_outliers$ID[which(subj_inclusion_outliers$include == 0)]
+
+cat(paste('Dropped subjects because > 2 outlier datapoints, N = ', length(drop_subj_outliers)))
+cat(drop_subj_outliers)
+
+if (length(drop_subj_outliers) > 0){
+  # Remove these subjects from particdat, data1, data2, alltask and alltaskall
+  particdat <- particdat[-which(particdat$ID %in% drop_subj_outliers), ] 
+  alltask <- alltask[-which(data1$Filename %in% drop_subj_outliers), ]
+  alltaskall <- alltaskall[-which(data1$Filename %in% drop_subj_outliers), ]
+  data1 <- data1[-which(data1$Filename %in% drop_subj_outliers), ]
+  data2 <- data2[-which(data2$Filename %in% drop_subj_outliers), ]
+}
+
+# Count final number of subjects
+nsubj_final <- dim(data1)[1]
+```
+
+```{r demographics}
+#Participant descriptors reported in paper
+gender_info <- particdat %>% group_by(Gender) %>% summarise(n=n())
+gender_by_study <- particdat %>% group_by(study, Gender) %>% summarise(n=n()) 
+gender_by_handedness <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n()) 
+gender_table <- cbind(gender_by_handedness$n[1:2], gender_by_handedness$n[3:4])
+colnames(gender_table) <- c('Left','Right')
+rownames(gender_table) <- c('Female','Male')
+
+print(gender_table)
+
+age_info <- particdat %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
+age_by_study <- particdat %>% group_by(study) %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
+
+# Do left / right handed participants differ in gender?
+chisq.test(gender_table)
+age_by_handedness <- particdat %>% group_by(handedness) %>% 
+  summarise(age_mean = mean(Age_m)/12, age_sd =sd(Age_m)/12)
+# Do left / right participants differ in age
+t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)])
+
+print(age_info)
+
+```
+
+## Read in and analyse task behavioural data
+
+```{r behaviouraldata}
+behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
+behavdat_Bangor <- read.csv('A2_Behavioural_Data_Bangor.csv') # this file is renamed; was A2_Results_Bangor.xlsx
+colnames(behavdat_A2)[1] <- 'ID'
+behavdat <- rbind(behavdat_A2,behavdat_Bangor)
+
+# Only include participants in particdat
+behavdat <- behavdat[which(behavdat$ID %in% particdat$ID), ]
+
+#NB Do not need to specify exclusions by sample or handedness here.
+#Participant ID has already incorporated there
+
+#word data
+word.cols<-grep('*.Words',colnames(behavdat))
+tab1a<- stargazer(behavdat[,word.cols],type='text',title="Word data")
+
+#accuracy data
+acc.cols<-grep('*.Acc', colnames(behavdat))
+cat('Percentages correct')
+stargazer(behavdat[,acc.cols],type='text',title="Percentages Correct")
+
+#RT data
+rt.cols<-grep('*.RT', colnames(behavdat))
+cat('RT')
+stargazer(behavdat[,rt.cols],type='text',title="RT")
+
+#omit data
+omit.cols<- grep('*.Omit',colnames(behavdat))
+cat('Omit')
+stargazer(behavdat[,omit.cols],type='text',title="Omit")
+nevents <- c(15,90,90,15,90,45,15,90,90,15,90,45) # The number of events in each condition
+
+# Do left and right handers show different levels of task performance?
+cols_to_test <- c(word.cols, acc.cols, rt.cols)
+behav_tests <- data.frame(
+  'Measure' = colnames(behavdat)[cols_to_test],
+  'df' = rep(NA, length(cols_to_test)),
+  't' = rep(NA, length(cols_to_test)),
+  'p' = rep(NA, length(cols_to_test))
+)
+
+for (i in 1:length(cols_to_test)){
+  my_test <- t.test(behavdat[which(particdat$handcode == 1), cols_to_test[i]], behavdat[which(particdat$handcode == 2), cols_to_test[i]], paired = FALSE)
+  behav_tests$df[i] <- my_test$parameter
+  behav_tests$t[i] <- my_test$statistic
+  behav_tests$p[i] <- my_test$p.value
+}
+corrected_alpha <- .05 / length(cols_to_test)
+cat(paste0('Alpha corrected for ', length(cols_to_test), ' multiple comparisons = ', corrected_alpha))
+
+if (length(which(behav_tests$p < corrected_alpha)) > 0){
+  cat(paste0('Significant difference between left and right handers observed for: '))
+  print(behav_tests$Measure[which(behav_tests$p < corrected_alpha)])
+}
+if (length(which(behav_tests$p < corrected_alpha)) == 0){
+  cat(paste0('No significant difference between left and right handers observed for number of words, RT or Accuracy on any task'))
+  cat(paste0('p > ', round(min(behav_tests$p), 4), ' in all cases.'))
+}
+
+```
+
+## Calculate means of LI values, check normality and create pirate plot
+
+
+```{r LI_means, warning=FALSE}
+# Modified script for ggpirate plot
+source('geom_pirate_ZW.R')
+
+# Create data frame for Shapiro Wilks test results
+handedness <- c('Right Handed', 'Left Handed')
+shapdf <- data.frame(matrix(NA, nrow=24, ncol=4))
+colnames(shapdf) <- c('Task', 'Session', 'Hand', 'p')
+myrow<-0 
+
+# Normality tests and plots
+for (i in 1:6){ # Loop through tasks
+  par(mfrow=c(2,4))
+  
+  for (j in 1:2){ # Loop through sessions
+  offset<- 6*(j-1)
+  
+    for (h in c(2,1)){ # Loop through handedness (left first so it's on the left of the plot)
+      myrow<-myrow+1
+      handedness_text <- handedness[h]
+      handedness_rows <- which(particdat$handcode == h)
+      tempdata<-alltask[handedness_rows,(i+offset)]
+      myshap<-shapiro.test(tempdata)
+      
+      # Histogram
+      plot (density (tempdata, na.rm = TRUE),
+            main = paste (handedness_text, '_', mylabels[(i + offset)]),
+            xlim = c(-6, 8), ylim = c(0, 0.4))
+      
+      
+      text(-2, 0.3, paste('mean = \n', round(mean(tempdata, na.rm = TRUE), 2)))
+      
+      # qqplot
+      qqnorm(tempdata); qqline(tempdata, col = 2)
+      text(1, 0, paste('Shapiro\np = ', round(myshap$p.value, 3)))
+      shapdf$Task[myrow] <- LETTERS[i] # Clever! Swaps numbers 1:6 to letters A:F
+      shapdf$Session[myrow] <- j
+      shapdf$Hand[myrow] <- h
+      shapdf$p[myrow] <- round(myshap$p.value, 3)
+    } # Hand loop
+  } # Session loop
+} # Task loop
+
+  
+# One-sample t-tests to compare LI to zero
+LI_ttests<-data.frame(matrix(NA,nrow=24,ncol=8))
+colnames(LI_ttests)<-c('Taskcode','Session','Hand','t','df','p','LI','lab')
+
+LI_ttests$Session <- rep(c(1,2),6)
+LI_ttests$Task <- rep(myshortlab,each=2)
+LI_ttests$Hand <- rep(c(1,2),each=12)
+
+myrow<-0 
+
+for (h in c(1,2)){ # Loop through handedness
+  handedness_rows <- which(particdat$handcode == h)
+  
+  for (t in 1:6){ # Loop through tasks
+    
+    for (s in 1:2){ # Loop through sessions
+      myrow <- myrow + 1
+      mycol <- t + ((s-1)*6) 
+      
+      # Perform t-test
+      my_test <- t.test(alltask[handedness_rows, mycol], alternative='greater')
+      
+      # Organise output
+      LI_ttests$Taskcode[myrow] <- LETTERS[t]
+      LI_ttests$Session[myrow] <- s
+      LI_ttests$Hand[myrow] <- handedness[h]
+      LI_ttests$t[myrow] <-round(my_test$statistic,2)
+      LI_ttests$df[myrow] <-my_test$parameter
+      LI_ttests$p[myrow] <-round(my_test$p.value,3)
+      LI_ttests$LI[myrow] <- max(alltask[handedness_rows, mycol],na.rm=TRUE)+1
+      mylabel <- ''
+      if(my_test$p.value<.05){mylabel <- "*"}
+      if(my_test$p.value<.01){mylabel <- "**"}
+      if(my_test$p.value<.001){mylabel <- "***"}
+      LI_ttests$lab[myrow] <- mylabel
+    } # Session loop
+  } # Task loop
+} # Hand loop
+
+LI_ttests$Taskcode <- as.factor(LI_ttests$Taskcode)
+LI_ttests$Session <- as.factor(LI_ttests$Session)
+LI_ttests$Hand <- as.factor(LI_ttests$Hand)
+
+# Collate LI data for pirate plot
+ID_data <- data.frame(
+  ID = as.factor(particdat$ID),
+  Hand = as.factor(particdat$handedness))
+pirate_data <- cbind(ID_data, alltaskall)
+
+LI_long <- melt(pirate_data, value.name = 'LI') #version with outliers 
+LI_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
+LI_long$Task <- rep(rep(myshortlab, each=nsubj_final), 2)
+LI_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = nsubj_final), 2)
+levels(LI_long$Hand) <- c('Left Handed','Right Handed')
+
+# Also identify excluded data points (NAs in alltask)
+NA_data <- cbind(ID_data, alltask)
+NA_long <- melt(NA_data, value.name = 'LI_NA')
+NA_long[ , 5:8] <- LI_long[ , 4:7]
+levels(NA_long$Hand) <- c('Left Handed','Right Handed')
+
+#add dummy rows to make the plot jitter work
+extra_data <- data.frame(matrix(20, nrow=2, ncol=14))
+colnames(extra_data) <- c('ID','Hand',colnames(alltask))  
+extra_data$ID <- as.factor('dummy')
+extra_data$Hand <- as.factor(c('L','R'))
+extra_long <- melt(extra_data, value.name = 'LI_NA')
+extra_long$Session <- as.factor(c(rep(1, 2*6), rep(2, 2*6)))
+extra_long$Task <- rep(rep(myshortlab, each=2), 2)
+extra_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = 2), 2)
+levels(extra_long$Hand) <- c('Left Handed','Right Handed')
+extra_long$LI_NA <- NA
+extra_long$LI <- NA
+
+# Combine with NA_long, and select only rows with excluded datapoints
+NA_long <- rbind(NA_long, extra_long)
+NA_long <- NA_long[which(is.na(NA_long$LI_NA)), ]
+
+# Make pirate plot
+my_pirate = ggplot(data = LI_long,
+                   mapping = aes(x = Taskcode,
+                                 y = LI,
+                                 colour = Session)) +
+ geom_pirate_ZW(points_params = list(shape = 16, alpha = 0.5),
+                 bars = FALSE,
+                 #bars_params = list(width = 3),
+                 #violins_params = list(width = 3),
+                 #cis_params = list(width = 3),
+                 #lines_params = list(width = 3),
+                 jitter_width = 0.4, show.legend=TRUE) +
+  labs(y = 'LI Value', x = 'Task') +
+  scale_y_continuous(breaks = seq(from = -6, to = 7, by = 1)) +
+  theme_bw() +
+  theme(legend.position = 'right', panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
+  geom_hline(yintercept = 0) +
+  facet_grid(.~Hand) +
+  # Asterisks for significant LI values
+  geom_text(data = LI_ttests, aes(x = Taskcode, group = Session, y = LI, label = lab),
+            position = position_dodge(0.7), colour = 'black') +
+  # Red points for outlier datapoints
+  geom_point(data = NA_long, aes(x = Taskcode, group = Session, y = LI),
+             position = position_dodge(0.7), colour = 'black', size = 0.8)
+
+print(my_pirate)
+
+ggsave(filename = 'My_pirate.png', plot = my_pirate, width = 8, height = 4)
+
+# Holy moly that was a lot of work for one plot
+```
+
+## Correlation matrix
+
+```{r corrheat,fig.height=6,figwidth=10}
+ilist <- c(1,7,2,8,3,9,4,10,5,11,6,12)
+both_cormats <- data.frame(matrix(data=NA, nrow=1, ncol=4))
+colnames(both_cormats) <- c('Var1','Var2','cor','Hand')
+
+for(h in 1:2){ # Loop through right and left handers
+  handedness_rows <- which(particdat$handcode == h)
+  
+  # Select alltask data and perform correlations
+  cormat<-round(cor(alltask[handedness_rows, ilist], use="pairwise.complete.obs", method="pearson"),2)
+  rownames(cormat)<-c('A1','A2','B1','B2','C1','C2','D1','D2','E1','E2','F1','F2')
+  colnames(cormat)<-c('A1','A2','B1','B2','C1','C2','D1','D2','E1','E2','F1','F2')
+  
+  # Use only the upper triangle of data (to avoid repetition)
+  get_upper_tri <- function(cormat){
+    cormat[lower.tri(cormat)]<- NA
+    return(cormat)
+  }
+  upper_tri <- get_upper_tri(cormat)
+  
+  # Melt into long format
+  melted_cormat <- melt(upper_tri, na.rm=T, value.name='cor')
+  colnames(melted_cormat)[1:2]<-c('Var1','Var2') #names of cols 1 and 2
+  melted_cormat$Hand <- h
+  
+  both_cormats <- rbind(both_cormats, melted_cormat)
+}
+both_cormats <- both_cormats[-1,]
+both_cormats$Hand <- as.factor(both_cormats$Hand)
+both_cormats$Hand <- factor(both_cormats$Hand, levels(both_cormats$Hand)[c(2,1)])
+levels(both_cormats$Hand) <- c('Left Handed','Right Handed')
+
+# Create correlation heatmap using ggplot
+ggheatmap <- ggplot(data = both_cormats, aes(Var2, Var1, fill = cor)) +
+  geom_tile(colour = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", 
+                       name="Pearson Correlation") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(vjust = 1, size = 10, hjust = 0.5, colour = 'black'),
+        axis.text.y = element_text(vjust = 0.5, size = 10, hjust = 1, colour = 'black')) +
+  coord_fixed() +
+  facet_grid(.~Hand)
+
+#add some formatting
+my_cormat <- ggheatmap + 
+  geom_text(aes(Var2, Var1, label = cor), color = "black", size = 4) +
+  theme(
+    axis.title.x = element_blank(), axis.title.y = element_blank(),
+    panel.grid.major = element_blank(), panel.border = element_rect(colour = 'black', fill = NA),
+    #panel.background = element_rect(fill = 'grey'),
+    axis.ticks = element_blank(),
+    legend.position = 'bottom',
+    legend.direction = "horizontal",
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    strip.text.x = element_text(size = 20),
+    strip.background = element_rect(fill = 'grey90', colour = 'black')) +
+  guides(fill = guide_colorbar(barwidth = 9, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+print(my_cormat)
+
+ggsave(filename = 'My_cormat.png', dpi=300, plot = my_cormat, width = 10, height = 6)
+```
+
+
+##Check reason for test-retest reliability issues in right handers
+
+```{r retestscatter, warnings = FALSE}
+scatter1 <- alltask[ , 1:6] %>% gather(key = Task, value = Session1)
+scatter2 <- alltask[ , 7:12] %>% gather(key = Task, value = Session2)
+
+scatterdata <- data.frame('Study' = as.factor(particdat$study), 'ID' = particdat$ID, 'Hand' = particdat$handedness,
+                          'Session1' = scatter1$Session1, 'Session2' = scatter2$Session2, 
+                          'Task' = rep(LETTERS[1:6], each = nsubj_final))
+scatterdata$Task <- as.factor(scatterdata$Task)
+
+myscatter <- ggplot(data = scatterdata, aes(x = Session1, y = Session2, colour = Hand)) +
+  geom_point(alpha = 0.7) + theme_bw() + geom_abline(intercept = 0, slope = 1) + ylim(-6,6) + xlim(-6,6) + 
+  facet_wrap(~Task) 
+  #geom_text(aes(x = 3, y = -3, label = 'Testing...'))
+
+print(myscatter)
+
+ggsave(filename = 'My_scatter.png', dpi=300, plot = myscatter, width = 10, height = 6)
+```
+
+
+## Structural Equation Modeling
+
+### Try with different order of variables
+
+```{r reordertasks}
+#Reassuring that reordering variables does not affect model fit
+#However, it does affect the model structure.
+#The first variable in the list will have fixed paths to factor A (1) and B (0)
+
+if (tryreorder==1){ #See tryreorder toggle
+  alltask<-alltask[,nuorder] #See nuorder toggle
+  alltaskall<-alltaskall[,nuorder]
+  mylabels<-mylabels[nuorder]
+  myshortlab<-myshortlab[nuorder[1:length(myshortlab)]]
+  mylonglab<-mylonglab[nuorder[1:length(mylonglab)]]
+}
+myfixed<-myshortlab[1]
+```
+
+### Question 1: 1 vs 2 Factors
+
+Test SEM models with 1 or 2 factors.
+Keep left and right handers separate to start so that we can see if the same model wins in both groups, and if the results are reliable (drop one validation) 
+
+```{r SEM_1vs2}
+#=================================================================================#
+# Select RH data
+RH_row <- which(particdat$handcode == 1)
+dataRaw_RH <- mxData(observed = alltask[RH_row, ], type = 'raw')
+
+#  Select LH data
+LH_row <- which(particdat$handcode == 2)
+dataRaw_LH <- mxData( observed=alltask[LH_row, ], type = "raw" )
+
+#=================================================================================#
+# One Factor Models
+
+# Define Model1_RH
+Model1RH <- umxRAM("Model1RH", data=dataRaw_RH, suffix = "_RH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_RH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   # Factor variances: F1 free
+                   umxPath(var='F1', freeAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
+                   umxPath(means=c('F1'),fixedAt = 0))
+
+# Define Model1_LH
+Model1LH <- umxRAM("Model1LH", data=dataRaw_LH, suffix = "_LH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_LH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   # Factor variances: F1 free
+                   umxPath(var='F1', freeAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
+                   umxPath(means=c('F1'),fixedAt = 0))
+
+#=================================================================================#
+# Two Factor Models
+
+# Define Model2_RH
+Model2RH <- umxRAM("Model2RH", data=dataRaw_RH, suffix = "_RH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_RH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6,"_RH"), free = c(F,T,T,T,T,T), values = c(0,rep(1,5))),
+                   # Factor covariances: fixed to zero 
+                   umxPath(cov = c("F1", "F2"),fixedAt=0),
+                   # Factor variances: F1 free, F2 fixed at 1
+                   umxPath(var='F1', freeAt=1),
+                   umxPath(var='F2', fixedAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
+                   umxPath(means=c('F1','F2'),fixedAt = 0))
+
+# Define Model2_LH
+Model2LH <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_LH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6,"_LH"), free = c(F,T,T,T,T,T), values = c(0,rep(1,5))),
+                   # Factor covariances: fixed to zero 
+                   umxPath(cov = c("F1", "F2"),fixedAt=0),
+                   # Factor variances: F1 free, F2 fixed at 1
+                   umxPath(var='F1', freeAt=1),
+                   umxPath(var='F2', fixedAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
+                   umxPath(means=c('F1','F2'),fixedAt = 0))
+
+#=================================================================================#
+# Model comparison
+
+# Right handers
+mychitest_RH <- mxCompare(Model2RH, Model1RH)
+mychitest_RH
+# Left handers
+mychitest_LH <- mxCompare(Model2LH, Model1LH)
+mychitest_LH
+
+```
+
+Conclusion: The two factor model is the winner in both right and left handed groups, but the difference is marginal in right handers.
+Next: Test reliability of the 2 factor solution using drop-one analysis.
+
+## Check solution robustness with drop one approach and explore results
+
+This chunk drops one subject in each iteration and runs Model 4 (single factor) and Model 5 (bifactor).
+
+```{r dropone, message=FALSE, warning=FALSE,echo=TRUE,eval=FALSE,asis=FALSE}
+#Set up model definition
+factor_loadings_1 <- umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6), free = c(F,T,T,T,T,T), values = rep(1,6))
+factor_loadings_2 <- umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6), free = c(F,T,T,T,T,T), values = c(0,rep(1,5)))
+factor_covariances <- umxPath(cov = c("F1", "F2"),fixedAt=0)
+factor_variances_1 <- umxPath(var='F1', freeAt=1)
+factor_variances_2 <- umxPath(var='F2', fixedAt=1)
+residual_variances <- umxPath(var=mylabels, labels = paste0("var_",1:6), freeAt=1)
+indicator_means <- umxPath(means=mylabels, labels = paste0("mean_",1:6), freeAt=1)
+factor_means_1 <- umxPath(means=c('F1'),fixedAt = 0)
+factor_means_2 <- umxPath(means=c('F1','F2'),fixedAt = 0)
+
+#=================================================================================#
+# Drop-one loop
+
+#Use'drop one' approach - reduce the dataset by one on each run
+for (group in 1:2){
+  
+  # Select subjects
+  nsubs <- length(RH_row)
+  if(group == 2){nsubs <- length(LH_row)}
+  
+  # Create dataframe to save the results
+  dropone_results <- matrix(data = NA, nrow = nsubs, ncol = 5)
+  dropone_paths <-matrix(data=NA,nrow=nsubs,ncol=23)
+  
+  for (thisdrop in 1:nsubs){
+    
+    myrows <- RH_row
+    if(group ==2){myrows <- LH_row}
+    
+    dataRaw <- mxData(observed = alltask [myrows [-thisdrop], ], type="raw")
+    
+    # Estimate Factor 1 model
+    myModel1 <- umxRAM("myModel1", data=dataRaw, 
+                       factor_loadings_1, factor_variances_1, residual_variances, indicator_means, factor_means_1,autoRun=FALSE)
+    mysum1<-mxRun(myModel1)
+    summary.Model1 <- summary(mxRun(mysum1))
+    
+    # Estimate Factor 2 model
+    myModel2 <- umxRAM('myModel2', data=dataRaw,
+                       factor_loadings_1, factor_loadings_2, factor_covariances, factor_variances_1, factor_variances_2,
+                       residual_variances, indicator_means, factor_means_2,autoRun = FALSE)
+    mysum2<-mxRun(myModel2)
+    summary.Model2 <- summary(mysum2)                  
+    
+    #Compare Models
+    mcomp <- mxCompare(mysum2, mysum1)
+    
+    #Write results to dropone_results data frame
+    dropone_results[thisdrop, 1] <- round(summary.Model1$BIC.Mx, 3)
+    dropone_results[thisdrop, 2] <- round(summary.Model2$BIC.Mx, 3)
+    dropone_results[thisdrop, 3] <- round(mcomp$diffLL[2], 3)
+    dropone_results[thisdrop, 4] <- mcomp$diffdf[2]
+    dropone_results[thisdrop, 5] <- round(mcomp$p[2], 5)
+
+  }
+  
+    colnames(dropone_results) <- c('BIC_mod1','BIC_mod2','chi.diff','df.diff','p.diff')
+    dropone_results<-data.frame(dropone_results)
+    dropone_results$BIC_diff <- dropone_results$BIC_mod1 - dropone_results$BIC_mod2
+    dropone_results$bestModel<-'one factor'
+    w<-which(dropone_results$p.diff < .05 & dropone_results$BIC_diff > 0)
+    dropone_results$bestModel[w]<-'bifactor'
+    
+  if (group == 1){dropone_results_RH <- dropone_results}
+  if (group == 2){dropone_results_LH <- dropone_results}
+  
+}
+
+```
+
+### SEM Multigroup models: 2 factors.
+
+Two factor multigroup models, comparing constrained and unconstrained models
+
+```{r SEM_multigroup}
+#=================================================================================#
+# Constrained multigroup model where factor loadings are set to be the same in the two groups
+Model2_unc_mg <- umxSuperModel("Model2_unconstrained", Model2RH, Model2LH)
+
+#=================================================================================#
+# Constrained multigroup model where factor loadings are set to be the same in the two groups
+
+# Right handers
+Model2RH_con <- umxRAM("Model2RH", data=dataRaw_RH, suffix = "_RH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6), free = c(F,T,T,T,T,T), values = c(0,rep(1,5))),
+                   # Factor covariances: fixed to zero 
+                   umxPath(cov = c("F1", "F2"),fixedAt=0),
+                   # Factor variances: F1 free, F2 fixed at 1
+                   umxPath(var='F1', freeAt=1),
+                   umxPath(var='F2', fixedAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
+                   umxPath(means=c('F1','F2'),fixedAt = 0))
+
+# Left handers
+Model2LH_con <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
+                   # Factor loadings
+                   umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6), free = c(F,T,T,T,T,T), values = rep(1,6)),
+                   umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6), free = c(F,T,T,T,T,T), values = c(0,rep(1,5))),
+                   # Factor covariances: fixed to zero 
+                   umxPath(cov = c("F1", "F2"),fixedAt=0),
+                   # Factor variances: F1 free, F2 fixed at 1
+                   umxPath(var='F1', freeAt=1),
+                   umxPath(var='F2', fixedAt=1),
+                   # Residual variances
+                   umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
+                   # Means 
+                   umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
+                   umxPath(means=c('F1','F2'),fixedAt = 0))
+
+Model2_con_mg <- umxSuperModel("Model2_constrained", Model2RH_con, Model2LH_con)
+
+#=================================================================================#
+# Comparison of unconstrained and constrained multigroup models
+
+anova(Model2_unc_mg, Model2_con_mg)
+
+```
+
+Conclusion: For the 2 factor model, the unconstrained model IS significantly better than the constrained model, but the effect is small. The (cautious) conclusion is that for this model, there is a difference between the factor loadings for the left and right handed groups.
+
+### Plotting results of the winning SEM model
+
+The remaining analyses will focus on the model with the strongest evidence: 2 factor model where factor loadings could differ between left and right handed groups (unconstrained)
+
+<!--
+```{r FactorPlots}
+#=================================================================================#
+# Select Factor 1 loadings for plotting 
+# The parameters are from the multigroup model, but the separate model ones are the same)
+# The right handed group comes first
+winning_summary <- summary(Model2_unc_mg)
+
+real_est_path <- winning_summary$parameters$Estimate
+real_est_se <- winning_summary$parameters$Std.Error
+mylowCI <- real_est_path - 1.96*real_est_se
+myhighCI <- real_est_path + 1.96*real_est_se
+
+# NB: In this data, the rows are as follows:
+# 1-5:    Factor 1 loadings, RH
+# 6-10:   Factor 2 loadings, RH
+# 11-16:  Residual variances, RH
+# 17:     Factor 1 variance, RH
+# 18-23:  Means, RH
+
+# 24-28:  Factor 1 loadings, LH
+# 29-33:   Factor 2 loadings, LH
+# 34-39:  Residual variances, LH
+# 40:     Factor 1 variance, LH
+# 41-46:  Means, LH
+
+# Bear in mind that if you change the winning model, the indices below will also need to change!!
+
+Factor1_plot_data = data.frame(
+  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Group' = rep(c('Left Handed', 'Right Handed'), each = 6), # Left handers first to make the plot work
+  'Loading' = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
+                real_est_path[1:3],1,real_est_path[4:5]),    # Factor 1 loadings, RH
+  'lowCI' = c(mylowCI[24:26],1,mylowCI[27:28],               # Factor 1 low CI, LH
+              mylowCI[1:3],1,mylowCI[4:5]),                  # Factor 1 low CI, RH
+  'highCI' = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
+               myhighCI[1:3],1,myhighCI[4:5])                # Factor 1 high CI, RH
+)
+Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
+
+#=================================================================================#
+# Plot Factor 1 loadings
+my_factor1 <- ggplot(Factor1_plot_data, aes(x = Task, y = Loading, fill = Task)) +
+  geom_boxplot(lower = Factor1_plot_data$lowCI, upper = Factor1_plot_data$highCI) +
+  ylim(-1,2) +
+  theme_bw() +
+  geom_hline(yintercept = 0) +
+  ylab('Factor 1 Loadings') +
+  facet_grid(.~Group)+theme(legend.position ='none')
+
+print(my_factor1)
+ggsave(filename = 'My_factor1.png', dpi=300, plot = my_factor1, width = 6, height = 2.5)  
+
+#=================================================================================#
+# Select Factor 2 loadings for plotting
+Factor2_plot_data = data.frame(
+  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Group' = rep(c('Left Handed','Right Handed'), each = 6),
+  'Loading' = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
+                real_est_path[6:8],0,real_est_path[9:10]), # Right Handers factor 1 loadings
+  'lowCI' = c(mylowCI[29:31],0,mylowCI[32:33], # Left Handers factor1 low CI
+              mylowCI[6:8],0,mylowCI[9:10]), # Right Handers factor1 low CI
+  'highCI' = c(myhighCI[29:31],0,myhighCI[32:33],
+               myhighCI[6:8],0,myhighCI[9:10])
+)
+
+Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor2_plot_data$Group <- factor(Factor2_plot_data$Group)
+
+#=================================================================================#
+# Plot Factor 2 loadings
+my_factor2 <- ggplot(Factor2_plot_data, aes(x = Task, y = Loading, fill = Task)) +
+  geom_boxplot(lower = Factor2_plot_data$lowCI, upper = Factor2_plot_data$highCI) +
+  ylim(-1,2) +
+  theme_bw() +
+  geom_hline(yintercept = 0) +
+  ylab('Factor 2 Loadings') +
+  facet_grid(.~Group) + theme(legend.position='none')
+
+print(my_factor2)
+ggsave(filename = 'My_factor2.png', dpi=300, plot = my_factor2, width = 6, height = 2.5) 
+```
+-->
+
+```{r FactorPlots2,fig.width=10,fig.height=10,echo=TRUE}
+#=================================================================================#
+# Select Factor 1 loadings for plotting 
+# The parameters are from the multigroup model, but the separate model ones are the same)
+# The right handed group comes first
+winning_summary <- summary(Model2_unc_mg)
+
+real_est_path <- winning_summary$parameters$Estimate
+real_est_se <- winning_summary$parameters$Std.Error
+mylowCI <- real_est_path - 1.96*real_est_se
+myhighCI <- real_est_path + 1.96*real_est_se
+
+# NB: In this data, the rows are as follows:
+# 1-5:    Factor 1 loadings, RH
+# 6-10:   Factor 2 loadings, RH
+# 11-16:  Residual variances, RH
+# 17:     Factor 1 variance, RH
+# 18-23:  Means, RH
+
+# 24-28:  Factor 1 loadings, LH
+# 29-33:   Factor 2 loadings, LH
+# 34-39:  Residual variances, LH
+# 40:     Factor 1 variance, LH
+# 41-46:  Means, LH
+
+# Bear in mind that if you change the winning model, the indices below will also need to change!!
+
+Factor1_plot_data = data.frame(
+  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Group' = rep(c('Left Handed', 'Right Handed'), each = 6), # Left handers first to make the plot work
+  'Loading' = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
+                real_est_path[1:3],1,real_est_path[4:5]),    # Factor 1 loadings, RH
+  'lowCI' = c(mylowCI[24:26],1,mylowCI[27:28],               # Factor 1 low CI, LH
+              mylowCI[1:3],1,mylowCI[4:5]),                  # Factor 1 low CI, RH
+  'highCI' = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
+               myhighCI[1:3],1,myhighCI[4:5])                # Factor 1 high CI, RH
+)
+Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
+Factor1_plot_data$Factor<-rep('Factor 1',length(Factor1_plot_data[,1]))
+#=================================================================================#
+# Plot Factor 1 loadings
+# my_factor1 <- ggplot(Factor1_plot_data, aes(x = Task, y = Loading, fill = Task)) +
+#   geom_boxplot(lower = Factor1_plot_data$lowCI, upper = Factor1_plot_data$highCI) +
+#   ylim(-1,2) +
+#   theme_bw() +
+#   geom_hline(yintercept = 0) +
+#   ylab('Factor 1 Loadings') +
+#   facet_grid(.~Group)+theme(legend.position ='none')
+# 
+# print(my_factor1)
+# ggsave(filename = 'My_factor1.png', dpi=300, plot = my_factor1, width = 6, height = 2.5)  
+
+#=================================================================================#
+# Select Factor 2 loadings for plotting
+Factor2_plot_data = data.frame(
+  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Group' = rep(c('Left Handed','Right Handed'), each = 6),
+  'Loading' = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
+                real_est_path[6:8],0,real_est_path[9:10]), # Right Handers factor 1 loadings
+  'lowCI' = c(mylowCI[29:31],0,mylowCI[32:33], # Left Handers factor1 low CI
+              mylowCI[6:8],0,mylowCI[9:10]), # Right Handers factor1 low CI
+  'highCI' = c(myhighCI[29:31],0,myhighCI[32:33],
+               myhighCI[6:8],0,myhighCI[9:10])
+)
+
+Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor2_plot_data$Group <- factor(Factor2_plot_data$Group)
+Factor2_plot_data$Factor<-rep('Factor 2',length(Factor2_plot_data[,1]))
+
+Factor_plot_data<-rbind(Factor1_plot_data,Factor2_plot_data)
+Factor_plot_data$Factor<-as.factor(Factor_plot_data$Factor)
+#=================================================================================#
+# Plot Factor 2 loadings
+my_factor_both <- ggplot(Factor_plot_data, aes(x = Task, y = Loading, fill = Task)) +
+  geom_boxplot(lower = Factor_plot_data$lowCI, upper = Factor_plot_data$highCI) +
+  ylim(-1,2) +
+  theme_bw() +
+  geom_hline(yintercept = 0) +
+  ylab('Factor Loadings') +
+  facet_grid(Factor~Group) + theme(legend.position='none')
+
+print(my_factor_both)
+#ggsave(filename = 'My_factorboth.png', dpi=300, plot = my_factor2, width = 6, height = 2.5) 
+```
+
+
+## Make factor scores and plot them
+
+```{r makefacscores}
+
+#This is with loadings - but it makes little difference
+#In weighted sum use original data, including excluded datapoints (alltaskall) to avoid losing subjects from this
+
+#=================================================================================#
+# Right handers
+
+# Select factor loadings for right handers
+allf1_RH <- c(1, real_est_path[1:5]) # Factor 1, RH
+allf2_RH <- c(0, real_est_path[6:10]) # Factor 2, RH
+
+# Multiply LI values by factor loading and sum to give factor scores for each individual
+for (i in 1:length(RH_row)){
+  # Factor 1
+  alltask$f1score[RH_row[i]] <- alltaskall[RH_row[i],1] * allf1_RH[1] + 
+                        alltaskall[RH_row[i],2] * allf1_RH[2] +
+                        alltaskall[RH_row[i],3] * allf1_RH[3]+
+                        alltaskall[RH_row[i],4] * allf1_RH[4]+
+                        alltaskall[RH_row[i],5] * allf1_RH[5]+
+                        alltaskall[RH_row[i],6] * allf1_RH[6]+
+                        alltaskall[RH_row[i],7] * allf1_RH[1]+
+                        alltaskall[RH_row[i],8] * allf1_RH[2]+
+                        alltaskall[RH_row[i],9] * allf1_RH[3]+
+                        alltaskall[RH_row[i],10] * allf1_RH[4]+
+                        alltaskall[RH_row[i],11] * allf1_RH[5]+
+                        alltaskall[RH_row[i],12] * allf1_RH[6]
+  # Factor 2
+  alltask$f2score[RH_row[i]] <- alltaskall[RH_row[i],1] * allf2_RH[1]+
+                        alltaskall[RH_row[i],2] * allf2_RH[2]+
+                        alltaskall[RH_row[i],3] * allf2_RH[3]+
+                        alltaskall[RH_row[i],4] * allf2_RH[4]+
+                        alltaskall[RH_row[i],5] * allf2_RH[5]+
+                        alltaskall[RH_row[i],6] * allf2_RH[6]+
+                        alltaskall[RH_row[i],7] * allf2_RH[1]+
+                        alltaskall[RH_row[i],8] * allf2_RH[2]+
+                        alltaskall[RH_row[i],9] * allf2_RH[3]+
+                        alltaskall[RH_row[i],10] * allf2_RH[4]+
+                        alltaskall[RH_row[i],11] * allf2_RH[5]+
+                        alltaskall[RH_row[i],12] * allf2_RH[6]
+}
+#check for bivariate outliers
+facmod_RH <- lm(alltask$f1score[RH_row] ~ alltask$f2score[RH_row])
+alltask$cookdist <- 0
+alltask$cookdist[RH_row] <- cooks.distance(facmod_RH)
+
+#=================================================================================#
+# Left handers
+allf1_LH <- c(1, real_est_path[24:28]) # Factor 1, LH
+allf2_LH <- c(0, real_est_path[29:33]) # Factor 2, LH
+
+for (i in 1:length(LH_row)){
+  # Factor 1
+  alltask$f1score[LH_row[i]] <- alltaskall[LH_row[i],1] * allf1_LH[1] + 
+                        alltaskall[LH_row[i],2] * allf1_LH[2] +
+                        alltaskall[LH_row[i],3] * allf1_LH[3]+
+                        alltaskall[LH_row[i],4] * allf1_LH[4]+
+                        alltaskall[LH_row[i],5] * allf1_LH[5]+
+                        alltaskall[LH_row[i],6] * allf1_LH[6]+
+                        alltaskall[LH_row[i],7] * allf1_LH[1]+
+                        alltaskall[LH_row[i],8] * allf1_LH[2]+
+                        alltaskall[LH_row[i],9] * allf1_LH[3]+
+                        alltaskall[LH_row[i],10] * allf1_LH[4]+
+                        alltaskall[LH_row[i],11] * allf1_LH[5]+
+                        alltaskall[LH_row[i],12] * allf1_LH[6]
+  # Factor 2
+  alltask$f2score[LH_row[i]] <- alltaskall[LH_row[i],1] * allf2_LH[1]+
+                        alltaskall[LH_row[i],2] * allf2_LH[2]+
+                        alltaskall[LH_row[i],3] * allf2_LH[3]+
+                        alltaskall[LH_row[i],4] * allf2_LH[4]+
+                        alltaskall[LH_row[i],5] * allf2_LH[5]+
+                        alltaskall[LH_row[i],6] * allf2_LH[6]+
+                        alltaskall[LH_row[i],7] * allf2_LH[1]+
+                        alltaskall[LH_row[i],8] * allf2_LH[2]+
+                        alltaskall[LH_row[i],9] * allf2_LH[3]+
+                        alltaskall[LH_row[i],10] * allf2_LH[4]+
+                        alltaskall[LH_row[i],11] * allf2_LH[5]+
+                        alltaskall[LH_row[i],12] * allf2_LH[6]
+}
+#check for bivariate outliers
+facmod_LH <- lm(alltask$f1score[LH_row] ~ alltask$f2score[LH_row])
+alltask$cookdist[LH_row] <- cooks.distance(facmod_LH)
+
+
+plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = 'Cooks Distance', xlab = 'Participant')
+w<-which(alltask$cookdist>(4*mean(alltask$cookdist)))
+abline(h=4*mean(alltask$cookdist), lty=2)
+abline(v=37.5, lty=2)
+text(x = 10, y = 0.14, labels = 'black = right handed\nred = left handed')
+cat('Influential points are:') # These values are ROW NUMBERS not PARTICIPANT IDs
+w
+alltask$bivoutlier <-0
+alltask$bivoutlier[w] <-1
+
+#make plot, showing outliers and left-handers
+plot(alltask$f1score,alltask$f2score,pch=(15+alltask$bivoutlier),col=particdat$handcode,
+     xlab='Factor 1',ylab='Factor 2', xlim=c(-30, 30))
+abline(v=0,lty=2)
+abline(h=0,lty=2)
+mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use='pairwise.complete.obs'), 3)
+mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use='pairwise.complete.obs'), 3)
+text(-10,20,paste('Right Handers: r = ',mycor_RH))
+text(-10,13,paste('Left Handers: r = ',mycor_LH), col='red')
+
+```
+
+
+<!--
+## Jacknife estimates of path SEs
+
+Jacknife estimates considered for model SEs, which can be compared with standard method. The jacknife method uses the output from the drop-one analysis to look at distribution of estimates obtained with one subject omitted.
+
+```{R jackknife,eval=FALSE,include=FALSE}
+ # Calculates the jackknife estimates (bias corrected) and the bias. Then prints out corrected estimates vs the "real" estimates from the original model 5 run.
+ #NB based on dropone_paths: this is matrix with nsub rows and 23 cols, with the columns corresponding to path estimates in the model.
+ n=myrow
+
+ #jacknife summary
+ avgpathmeans<-colMeans(dropone_paths) #average estimate across all dropone runs
+ jk_bias<-(n-1)*(avgpathmeans-real_est_path)
+
+ jack_est<-(n*real_est_path)-((n-1)*avgpathmeans)
+ pngname<-paste0('jacknifeplot_fix',myfixed,'.png')
+png(pngname, width=4, height=4, units="in", res=300)
+
+ plot(real_est_path,jack_est)
+ dev.off()
+
+ # calculates the jackknife SE estimates to allow us to calculate the CI.
+
+ mycol<-length(real_est_path)
+ jack_SE<-vector(mode="numeric",length=mycol)
+ for (i in 1:(mycol))
+ {
+   jack_SE[i]<-sqrt(((n-1)/n)*sum((dropone_paths[,i]-avgpathmeans[i])^2))
+ }
+ myres<-data.frame(real_est_path)
+ colnames(myres)[1]<-'Estimate'
+ myres$L_ci<-round(real_est_path-1.65*real_est_se,2)
+ myres$U_ci<-round(real_est_path+1.65*real_est_se,2)
+ myres$jack_Estimate<-round(jack_est,2)
+ myres$jack_Std.Error<-round(jack_SE,2)
+ myres$jk_L_ci<-round(jack_est-1.65*jack_SE,2)
+ myres$jk_U_ci<-round(jack_est+1.65*jack_SE,2)
+ myres$jk_bias<-round(jk_bias,2)
+ myres$Estimate<-round(myres$Estimate,2)
+
+ plot(myres$Estimate,myres$jack_Estimate,main ='Jacknife analysis')
+ write.csv(myres,"jacknife_ests.csv")
+
+```
+-->
+
+## Exploratory tests of handedness
+
+```{r exploratory,echo=FALSE,message=FALSE,WARNING=FALSE}
+#exploring various links with handedness
+
+apa_PT<-function (test.object, tails = 2, sig.digits = 5, p.lb = 0.01) 
+{
+    statistic.id <- substr(names(test.object$statistic), start = 1, 
+        stop = 1)
+    p.value <- test.object$p.value
+    if (tails == 1) {
+        p.value <- p.value/2
+    }
+    if (p.value < p.lb) {
+        p.display <- paste("p = ", round(p.value,sig.digits), " (", tails, "-tailed)", 
+            sep = "")
+    }
+    if (p.value > p.lb) {
+        p.display <- paste("p = ", round(p.value, sig.digits), 
+            " (", tails, "-tailed)", sep = "")
+    }
+    add.par <- ""
+    if (grepl("product-moment", test.object$method)) {
+        estimate.display <- paste("r = ", round(test.object$estimate, 
+            sig.digits), ", ", sep = "")
+    }
+    if (grepl("Chi", test.object$method)) {
+        estimate.display <- ""
+        add.par <- paste(", N = ", sum(test.object$observed), 
+            sep = "")
+    }
+    if (grepl("One Sample t-test", test.object$method)) {
+        estimate.display <- paste("mean = ", round(test.object$estimate, 
+            sig.digits), ", ", sep = "")
+    }
+    if (grepl("Two Sample t-test", test.object$method)) {
+        estimate.display <- paste("mean difference = ", round(test.object$estimate[2] - 
+            test.object$estimate[1], sig.digits), ", ", sep = "")
+    }
+    return(paste(estimate.display, statistic.id, "(", round(test.object$parameter, 
+        sig.digits), add.par, ") = ", round(test.object$statistic, 
+        sig.digits), ", ", p.display, sep = ""))
+}
+
+
+# Calculate difference between SentGen minus ListGen (averaged over both sessions)
+mydiff<-(alltaskall$SentGen1+alltaskall$SentGen2)/2-(alltaskall$ListGen1+alltaskall$ListGen2)/2
+
+particdat$handcode<-as.factor(particdat$handcode)
+levels(particdat$handcode)<-c('R','L')
+
+# Does this difference vary with handedness?
+cat('Does this difference vary with handedness?','\n')
+cat(apa_PT(t.test(mydiff~particdat$handcode)),'\n')
+plot(mydiff~particdat$handcode,main=apa_PT(t.test(mydiff~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat('\n')
+# Which other tasks vary with handedness?
+cat('Which other tasks vary with handedness?','\n')
+
+taskA_LG<-(alltaskall$ListGen1+alltaskall$ListGen2)/2
+cat('Task A: ',apa_PT(t.test(taskA_LG~particdat$handcode)),'\n')
+plot(taskA_LG~particdat$handcode,main=apa_PT(t.test(taskA_LG~particdat$handcode)),xlab='Hand',ylab='Difference score')
+
+taskB_PD<-(alltaskall$PhonDec1+alltaskall$PhonDec2)/2
+cat('Task B: ',apa_PT(t.test(taskB_PD~particdat$handcode)),'\n')
+plot(taskB_PD~particdat$handcode,main=apa_PT(t.test(taskB_PD~particdat$handcode)),xlab='Hand',ylab='Difference score')
+
+taskC_SD<-(alltaskall$SemDec1+alltaskall$SemDec2)/2
+cat('Task C: ', apa_PT(t.test(taskC_SD~particdat$handcode)),'\n')
+plot(taskC_SD~particdat$handcode,main=apa_PT(t.test(taskC_SD~particdat$handcode)),xlab='Hand',ylab='Difference score')
+
+taskD_SG<-(alltaskall$SentGen1+alltaskall$SentGen2)/2
+cat('Task D: ',apa_PT(t.test(taskD_SG~particdat$handcode)),'\n')
+plot(taskD_SG~particdat$handcode,main=apa_PT(t.test(taskD_SG~particdat$handcode)),xlab='Hand',ylab='Difference score')
+
+taskE_SC<-(alltaskall$SentComp1+alltaskall$SentComp2)/2
+cat('Task E: ', apa_PT(t.test(taskE_SC~particdat$handcode)),'\n')
+plot(taskE_SC~particdat$handcode,main=apa_PT(t.test(taskE_SC~particdat$handcode)),xlab='Hand',ylab='Difference score')
+
+taskF_JD<-(alltaskall$Jabber1+alltaskall$Jabber2)/2
+cat('Task F: ', apa_PT(t.test(taskF_JD~particdat$handcode)),'\n')
+plot(taskF_JD~particdat$handcode,main=apa_PT(t.test(taskF_JD~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat('\n')
+# Do factor scores vary with handedness?
+cat('Do factor scores vary with handedness?','\n')
+cat('FACTOR 1: ', apa_PT(t.test(alltask$f1score~particdat$handcode)),'\n')
+cat('FACTOR 2: ', apa_PT(t.test(alltask$f2score~particdat$handcode)),'\n')
+cat('\n')
+# Count how many tasks a subject is left lateralised for
+for (i in 1:nrow(alltask)){
+  alltask$Nleftlat[i]<-length(which(c(taskA_LG[i], taskB_PD[i], taskC_SD[i],
+                                      taskD_SG[i], taskE_SC[i], taskF_JD[i])>0))
+}
+
+# Does the number of left lateralised tasks per participant vary with handedness?
+cat('Does the number of left lateralised tasks per participant vary with handedness?','\n')
+kable(table(alltask$Nleftlat,particdat$handcode))
+cat(apa_PT(t.test(alltask$Nleftlat~particdat$handcode)),'\n')
+
+  
+  # # Not sure what this is doing....
+  # alltask$handcode<-particdat$handcode
+  # alltaskhand<-alltask[order(alltask$f1score),]
+  # alltaskhand$lowf1<-0
+  # w<-which(alltaskhand$f1score<0)
+  # alltaskhand$lowf1[w]<-1
+  # alltaskhand$consistent<-0
+  # w<-c(which(alltaskhand$Nleftlat==6),which(alltaskhand$Nleftlat==0))
+  # alltaskhand$consistent[w]<-1
+
+
+```
+
+
+##Session information
+
+```{r sessinfo}
+sessionInfo()
+
+```
