@@ -61,7 +61,7 @@ library(dmm) #added for 'unfactor' command : nb this messes up some dplyr comman
 # On first use, please also install ggpirate as follows:
 # devtools::install_github("mikabr/ggpirate")
 library(ggpirate)
-
+library(heplots)
 ```
 
 ## Read in list of participants, drop those with incomplete data
@@ -69,6 +69,16 @@ library(ggpirate)
 ```{r participants}
 particdat_A2    <- read.csv('https://osf.io/5jt6q/download')
 particdat_Bangor<- read.csv('A2_Participant_Info_Bangor.csv',header=TRUE) 
+
+incomplete <- which(particdat_Bangor$Complete == 0)
+nincomplete <- length(incomplete)
+cat(paste(nincomplete, ' incomplete datasets excluded from analysis'))
+particdat_Bangor <- particdat_Bangor[-incomplete, ]
+
+new_subjects <- length(particdat_Bangor$ID)
+new_group_info <- particdat_Bangor %>% group_by(handedness) %>% summarise(n=n())
+cat(paste('\nCompete datasets from Bangor by group: '))
+new_group_info
 
 # Merge both datasets
 particdat <- rbind(particdat_A2[,c(1:4)], particdat_Bangor[,c(1:4)])
@@ -93,6 +103,14 @@ if (Fonly== 1){
   particdat <- filter(particdat,Gender=='F')
 }
 
+# Full datasets before excluding data:
+n_full_subj <- length(particdat$ID)
+full_group_info <- particdat %>% group_by(handedness) %>% summarise(n=n())
+cat(paste('\nCompete datasets from both sites combined: '))
+full_group_info
+
+full_gender_info <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n())
+full_gender_info
 ```
 
 ## Read in LI data, drop those with insufficient number of good trials
@@ -113,7 +131,7 @@ data2_Bangor <- read.csv('Bangor_Results_Session2.csv',stringsAsFactors=FALSE)
 data1 <- rbind(data1_A2, data1_Bangor)
 data2 <- rbind(data2_A2, data2_Bangor)
 
-# Only take the participants included in particdat (allows you to drop subjects by handedness)
+# Only take the participants included in particdat (allows you to drop subjects by handedness, and omits incomplete subjects)
 data1 <- data1[which(data1$Filename %in% particdat$ID), ] 
 data2 <- data2[which(data2$Filename %in% particdat$ID), ] 
 
@@ -173,8 +191,8 @@ for (i in 1:length(data1$Filename)){
 
 drop_subj <- subj_inclusion$ID[which(subj_inclusion$include == 0)]
 
-cat(paste('Dropped subjects because > 2 missing or dropped datapoints, N = ', length(drop_subj)))
-cat(drop_subj)
+cat(paste('\nDropped subjects because > 2 missing or dropped datapoints, N = ', length(drop_subj)))
+cat(paste('\nDropped subject(s): ',drop_subj))
 
 # Remove these subjects from particdat, data1, data2, alltask and alltaskall
 particdat <- particdat[-which(particdat$ID %in% drop_subj), ] 
@@ -232,7 +250,7 @@ for (i in 1:length(data1$Filename)){
 
 drop_subj_outliers <- subj_inclusion_outliers$ID[which(subj_inclusion_outliers$include == 0)]
 
-cat(paste('Dropped subjects because > 2 outlier datapoints, N = ', length(drop_subj_outliers)))
+cat(paste('\nDropped subjects because > 2 outlier datapoints, N = ', length(drop_subj_outliers)))
 cat(drop_subj_outliers)
 
 if (length(drop_subj_outliers) > 0){
@@ -246,6 +264,7 @@ if (length(drop_subj_outliers) > 0){
 
 # Count final number of subjects
 nsubj_final <- dim(data1)[1]
+cat(paste('\nFinal number of subjects: ', nsubj_final))
 ```
 
 ## Report demographic summary statistics for all INCLUDED participants
@@ -253,26 +272,21 @@ I.e omitting participants who have been excluded from the analysis as described 
 
 ```{r demographics}
 #Participant descriptors reported in paper
-gender_info <- particdat %>% group_by(Gender) %>% summarise(n=n())
-gender_by_study <- particdat %>% group_by(study, Gender) %>% summarise(n=n()) 
+n_info <- particdat %>% group_by(handedness, study, Gender) %>% summarise(n=n()) 
+n_info
+
 gender_by_handedness <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n()) 
 gender_table <- cbind(gender_by_handedness$n[1:2], gender_by_handedness$n[3:4])
 colnames(gender_table) <- c('Left','Right')
 rownames(gender_table) <- c('Female','Male')
+chisq.test(gender_table)
 
-print(gender_table)
 
 age_info <- particdat %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
-age_by_study <- particdat %>% group_by(study) %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
-
-# Do left / right handed participants differ in gender?
-chisq.test(gender_table)
-age_by_handedness <- particdat %>% group_by(handedness) %>% 
-  summarise(age_mean = mean(Age_m)/12, age_sd =sd(Age_m)/12)
-# Do left / right participants differ in age
-t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)])
-
 print(age_info)
+
+# Do left / right participants differ in age
+t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)], paired = FALSE)
 
 ```
 
@@ -1020,8 +1034,11 @@ abline(v=0,lty=2)
 abline(h=0,lty=2)
 mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use='pairwise.complete.obs'), 3)
 mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use='pairwise.complete.obs'), 3)
-text(-10,20,paste('Right Handers: r = ',mycor_RH))
-text(-10,13,paste('Left Handers: r = ',mycor_LH), col='red')
+text(-12,20,paste('Right Handers: r = ',mycor_RH))
+text(-12                 
+     ,13,paste('Left Handers: r = ',mycor_LH), col='red')
+pData<-cbind(alltask,particdat)
+covEllipses(x=pData[,c('f1score','f2score')],group=pData$handcode,pooled=FALSE,add=TRUE,col=c("black","red"),labels="")
 
 ```
 
