@@ -175,6 +175,7 @@ for (i in 1:6){
   if(length(ww) > 0){
     alltask[ww,(i+6)] <- NA
     dropN <- dropN + length(ww)
+    dropN
   }
 }
 cat(paste('Dropped datapoints because < 10 trials, N = ',dropN))
@@ -251,7 +252,7 @@ for (i in 1:length(data1$Filename)){
 drop_subj_outliers <- subj_inclusion_outliers$ID[which(subj_inclusion_outliers$include == 0)]
 
 cat(paste('\nDropped subjects because > 2 outlier datapoints, N = ', length(drop_subj_outliers)))
-cat(drop_subj_outliers)
+cat(paste('\n', drop_subj_outliers))
 
 if (length(drop_subj_outliers) > 0){
   # Remove these subjects from particdat, data1, data2, alltask and alltaskall
@@ -305,28 +306,48 @@ behavdat <- rbind(behavdat_A2,behavdat_Bangor)
 # Only include participants in particdat
 behavdat <- behavdat[which(behavdat$ID %in% particdat$ID), ]
 
+# Concatenate with handedness
+behavdat <- cbind(behavdat, handedness = particdat$handedness)
 #NB Do not need to specify exclusions by sample or handedness here.
 #Participant ID has already incorporated there
 
-#word data
-word.cols<-grep('*.Words',colnames(behavdat))
-tab1a<- stargazer(behavdat[,word.cols],type='text',title="Word data")
-
-#accuracy data
-acc.cols<-grep('*.Acc', colnames(behavdat))
-cat('Percentages correct')
-stargazer(behavdat[,acc.cols],type='text',title="Percentages Correct")
-
-#RT data
-rt.cols<-grep('*.RT', colnames(behavdat))
-cat('RT')
-stargazer(behavdat[,rt.cols],type='text',title="RT")
-
-#omit data
+# Fix omitted responses data
 omit.cols<- grep('*.Omit',colnames(behavdat))
-cat('Omit')
-stargazer(behavdat[,omit.cols],type='text',title="Omit")
-nevents <- c(15,90,90,15,90,45,15,90,90,15,90,45) # The number of events in each condition
+
+# The number of events in each condition
+nevents <- c(15, 15, 15, 15, # task A1, D1, A2, D2
+             90, 90, 90, 45, # tasks B1, C1, E1, F1
+             90, 90, 90, 45) # tasks B2, C2, E2, F2
+
+for (i in 1:length(omit.cols)){
+tmp <- behavdat[ , omit.cols[i]] / nevents[i] * 100 
+behavdat[ , omit.cols[i]] <- round(tmp, 2)
+}
+
+behavdat <- behavdat %>% dplyr::select(handedness, A1.Words, A2.Words, A1.Omit, A2.Omit,
+                   B1.Acc, B2.Acc, B1.RT, B2.RT, B1.Omit, B2.Omit,
+                   C1.Acc, C2.Acc, C1.RT, C2.RT, C1.Omit, C2.Omit,
+                   D1.Words, D2.Words, D1.Omit, D2.Omit,
+                   E1.Acc, E2.Acc, E1.RT, E2.RT, E1.Omit, E2.Omit,
+                   F1.Acc, F2.Acc, F1.RT, F2.RT, F1.Omit, F2.Omit)
+
+behav_means_LH <- round(colMeans(behavdat[which(behavdat$handedness=='L'),-1], na.rm = TRUE), 2)
+behav_means_RH <- round(colMeans(behavdat[which(behavdat$handedness=='R'),-1], na.rm = TRUE), 2)
+
+behav_sd_LH <- apply(behavdat[which(behavdat$handedness=='L') , -1], 2, function(x){
+  round(sd(x, na.rm = TRUE), 2)
+})
+behav_sd_RH <- apply(behavdat[which(behavdat$handedness=='R') , -1], 2, function(x){
+  round(sd(x, na.rm = TRUE), 2)
+})
+
+behav_table <- cbind(behav_means_LH, behav_sd_LH, behav_means_RH, behav_sd_RH)
+colnames(behav_table) <- c('LH mean', 'LH sd', 'RH mean', 'RH sd')
+kable(behav_table)
+
+word.cols <- grep('*.Words', colnames(behavdat))
+acc.cols<-grep('*.Acc', colnames(behavdat))
+rt.cols<-grep('*.RT', colnames(behavdat))
 
 # Do left and right handers show different levels of task performance?
 cols_to_test <- c(word.cols, acc.cols, rt.cols)
@@ -749,8 +770,7 @@ for (group in 1:2){
   
   # Create dataframe to save the results
   dropone_results <- matrix(data = NA, nrow = nsubs, ncol = 5)
-  dropone_paths <-matrix(data=NA,nrow=nsubs,ncol=23)
-  
+
   for (thisdrop in 1:nsubs){
     
     myrows <- RH_row
