@@ -311,25 +311,27 @@ behavdat <- cbind(behavdat, handedness = particdat$handedness)
 #NB Do not need to specify exclusions by sample or handedness here.
 #Participant ID has already incorporated there
 
-# Fix omitted responses data
-omit.cols<- grep('*.Omit',colnames(behavdat))
-
-# The number of events in each condition
-nevents <- c(15, 15, 15, 15, # task A1, D1, A2, D2
-             90, 90, 90, 45, # tasks B1, C1, E1, F1
-             90, 90, 90, 45) # tasks B2, C2, E2, F2
-
-for (i in 1:length(omit.cols)){
-tmp <- behavdat[ , omit.cols[i]] / nevents[i] * 100 
-behavdat[ , omit.cols[i]] <- round(tmp, 2)
-}
-
+# Fix order of columns
 behavdat <- behavdat %>% dplyr::select(handedness, A1.Words, A2.Words, A1.Omit, A2.Omit,
                    B1.Acc, B2.Acc, B1.RT, B2.RT, B1.Omit, B2.Omit,
                    C1.Acc, C2.Acc, C1.RT, C2.RT, C1.Omit, C2.Omit,
                    D1.Words, D2.Words, D1.Omit, D2.Omit,
                    E1.Acc, E2.Acc, E1.RT, E2.RT, E1.Omit, E2.Omit,
                    F1.Acc, F2.Acc, F1.RT, F2.RT, F1.Omit, F2.Omit)
+
+# Recalculate the number of omitted trials as a percentage
+omit.cols<- grep('*.Omit',colnames(behavdat))
+nevents <- c(15, 15, 90, 90, # task A1, A2, B1, B2
+             90, 90, 15, 15, # tasks C1, C2, D1, D2
+             90, 90, 45, 45) # tasks E1, E2, F1, F2
+for (i in 1:length(omit.cols)){
+tmp <- behavdat[ , omit.cols[i]] / nevents[i] * 100 
+behavdat[ , omit.cols[i]] <- round(tmp, 2)
+}
+
+# # Recalculate the RT data in ms rather than seconds
+# rt.cols<-grep('*.RT', colnames(behavdat))
+# behavdat[ , rt.cols] <- behavdat[ , rt.cols] * 1000
 
 behav_means_LH <- round(colMeans(behavdat[which(behavdat$handedness=='L'),-1], na.rm = TRUE), 2)
 behav_means_RH <- round(colMeans(behavdat[which(behavdat$handedness=='R'),-1], na.rm = TRUE), 2)
@@ -376,6 +378,7 @@ if (length(which(behav_tests$p < corrected_alpha)) == 0){
   cat(paste0('p > ', round(min(behav_tests$p), 4), ' in all cases.'))
 }
 
+kable(behav_tests)
 ```
 
 ## Calculate means of LI values, check normality and create pirate plot
