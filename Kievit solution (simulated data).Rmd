@@ -67,7 +67,7 @@ data_null<-as.data.frame(data_null)
 data_language<-as.data.frame(data_language)
 data_genLAT<-as.data.frame(data_genLAT)
 
-names(data_null)<-names(data_language)<-names(data_genLAT)<-names(data_genLAT2)<-c("dichotic1","dichotic2","rhyme1","rhyme2","faces1","faces2")
+names(data_null)<-names(data_language)<-names(data_genLAT)<-c("dichotic1","dichotic2","rhyme1","rhyme2","faces1","faces2")
 
 data_null<-data_null[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
 data_language<-data_language[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
@@ -84,6 +84,7 @@ This is a subset of SEM that dos not include any latent variables or directional
 library(lavaan)
 library(qpcR)
 library(tidyverse)
+library(semPlot)
 
 model1<-"
 dichotic1~~0*rhyme1
