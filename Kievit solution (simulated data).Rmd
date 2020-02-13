@@ -1,0 +1,156 @@
+---
+title: "Laterality_Paper2"
+author: "Zoe Woodhead & Paul Thompson"
+date: "13/02/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Set variables and load packages
+
+```{r settings, warning=FALSE, message=FALSE}
+
+require(tidyverse)
+library(MASS)
+```
+
+
+# Structural Equation Modeling
+
+## Simulate data
+
+```{r sim_dat}
+#========================================================================#
+# simulate multivariate normal data to test ESEM model on three outcomes.#
+#========================================================================#
+
+
+
+sig1 <- matrix(c(1,	0.7,	0,	0,	0,	0,
+                 0.7, 1, 0, 0, 0, 0,
+                 0, 0, 1, 0.7, 0, 0,
+                 0, 0, 0.7, 1, 0, 0,
+                 0,0,0,0,1,0.7,
+                 0,0,0,0,0.7,1),6,6,byrow=TRUE)
+
+data_null <- mvrnorm(n=300, mu = c(5,5,5,5,5,5), Sigma=sig1)
+
+#========================================================================#
+
+sig2 <- matrix(c(1,	0.7,	0.4,	0.4,	0,	0,
+                 0.7, 1, 0.4, 0.4, 0, 0,
+                 0.4, 0.4, 1, 0.7, 0, 0,
+                 0.4, 0.4, 0.7, 1, 0, 0,
+                 0,0,0,0,1,0.7,
+                 0,0,0,0,0.7,1),6,6,byrow=TRUE)
+
+data_language <- mvrnorm(n=300, mu = c(5,5,5,5,5,5), Sigma=sig2)
+
+#========================================================================#
+
+sig3 <- matrix(c(1,	0.7, 0.4,	0.4, 0.4, 0.4,
+                 0.7, 1, 0.4, 0.4, 0.4, 0.4,
+                 0.4, 0.4, 1, 0.7, 0.4, 0.4,
+                 0.4, 0.4, 0.7, 1, 0.4, 0.4,
+                 0.4,0.4,0.4,0.4,1,0.7,
+                 0.4,0.4,0.4,0.4,0.7,1),6,6,byrow=TRUE)
+
+data_genLAT <- mvrnorm(n=300, mu = c(5,5,5,5,5,5), Sigma=sig3)
+
+#========================================================================#
+
+data_null<-as.data.frame(data_null)
+data_language<-as.data.frame(data_language)
+data_genLAT<-as.data.frame(data_genLAT)
+
+names(data_null)<-names(data_language)<-names(data_genLAT)<-names(data_genLAT2)<-c("dichotic1","dichotic2","rhyme1","rhyme2","faces1","faces2")
+
+data_null<-data_null[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+data_language<-data_language[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+data_genLAT<-data_genLAT[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+
+#========================================================================#
+```
+
+## Roger Kievit's suggestion - modelling data with three prespecified covariance structures, then compare using AIC weights.
+
+This is a subset of SEM that dos not include any latent variables or directional paths. It only looks to constrain particular covariance patterns and report 'best' model according AIC weights.
+
+```{r Roger_mod}
+library(lavaan)
+library(qpcR)
+library(tidyverse)
+
+model1<-"
+dichotic1~~0*rhyme1
+dichotic1~~0*faces1 
+rhyme1~~0*faces1 
+"
+
+model2<-"
+dichotic1~~rhyme1 
+dichotic1~~0*faces1
+rhyme1~~0*faces1 
+"
+
+model3<-"
+dichotic1~~rhyme1 
+dichotic1~~faces1 
+rhyme1~~faces1
+"
+
+fit1A <- cfa(model1, data=data_null)
+fit2A <- cfa(model2, data=data_null)
+fit3A <- cfa(model3, data=data_null)
+
+aic_vector1 <- c(fitMeasures(fit1A, "aic"),fitMeasures(fit1A, "aic"),fitMeasures(fit1A, "aic"))
+
+fit1B <- cfa(model1, data=data_language)
+fit2B <- cfa(model2, data=data_language)
+fit3B <- cfa(model3, data=data_language)
+
+aic_vector2 <- c(fitMeasures(fit1B, "aic"),fitMeasures(fit2B, "aic"),fitMeasures(fit3B, "aic"))
+
+fit1C <- cfa(model1, data=data_genLAT)
+fit2C <- cfa(model2, data=data_genLAT)
+fit3C <- cfa(model3, data=data_genLAT)
+
+aic_vector3 <- c(fitMeasures(fit1C, "aic"),fitMeasures(fit2C, "aic"),fitMeasures(fit3C, "aic"))
+
+# summary(fit1A, fit.measures=TRUE)
+# summary(fit2A, fit.measures=TRUE)
+# summary(fit3A, fit.measures=TRUE)
+# 
+# summary(fit1B, fit.measures=TRUE)
+# summary(fit2B, fit.measures=TRUE)
+# summary(fit3B, fit.measures=TRUE)
+# 
+# summary(fit1C, fit.measures=TRUE)
+# summary(fit2C, fit.measures=TRUE)
+# summary(fit3C, fit.measures=TRUE)
+
+AICweights1<-akaike.weights(aic_vector1)$weights
+AICweights2<-akaike.weights(aic_vector2)$weights
+AICweights3<-akaike.weights(aic_vector3)$weights
+
+IC_objectweights1<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights1)
+IC_objectweights2<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights2)
+IC_objectweights3<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights3)
+
+ggplot(IC_objectweights1,aes(Model,values,fill=Model))+geom_bar(stat='identity',position="dodge")+ylab('Akaike weights') + theme_bw()
+
+semPaths(fit1A, "std")
+
+ggplot(IC_objectweights2,aes(Model,values,fill=Model))+geom_bar(stat='identity',position="dodge")+ylab('Akaike weights') + theme_bw()
+
+semPaths(fit2B, "std")
+
+ggplot(IC_objectweights3,aes(Model,values,fill=Model))+geom_bar(stat='identity',position="dodge")+ylab('Akaike weights') + theme_bw()
+
+semPaths(fit3C, "std")
+
+```
