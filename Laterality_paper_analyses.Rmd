@@ -644,6 +644,8 @@ for(h in 1:2){ # Loop through right and left handers
   }
   upper_tri <- get_upper_tri(cormat)
   
+  test
+  
   # Melt into long format
   melted_cormat <- melt(upper_tri, na.rm=T, value.name='cor')
   colnames(melted_cormat)[1:2]<-c('Var1','Var2') #names of cols 1 and 2
