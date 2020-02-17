@@ -44,7 +44,6 @@ remove.Ntrial     <- 1 # Set to 1 to run exclusion of those with < 12 good trial
 require(tidyverse)
 require(OpenMx)
 require(umx)
-require(stargazer) #simple commands for nice tables
 require(semTools) #for fit measures
 #library(DiagrammeR) #for the diagram
 require(stringr)
@@ -139,6 +138,13 @@ data2 <- data2[which(data2$Filename %in% particdat$ID), ]
 alltask <- cbind(dplyr::select(data1, A1.LI_mean, B1.LI_mean, C1.LI_mean, D1.LI_mean, E1.LI_mean, F1.LI_mean),
                  dplyr::select(data2, A2.LI_mean, B2.LI_mean, C2.LI_mean, D2.LI_mean, E2.LI_mean, F2.LI_mean))
 
+allN <- cbind(dplyr::select(data1, A1.N, B1.N, C1.N, D1.N, E1.N, F1.N),
+              dplyr::select(data2, A2.N, B2.N, C2.N, D2.N, E2.N, F2.N))
+sumN <- colSums(allN)
+sumN <- sum(sumN)
+total_trials <- 15*6*2*n_full_subj
+dropped_trials_pc <- (total_trials - sumN) / total_trials * 100
+
 #next loop added as R seems to think everything is a character
 for (v in 1:ncol(alltask)){
   alltask[,v]<-as.numeric(alltask[,v])
@@ -193,7 +199,7 @@ for (i in 1:length(data1$Filename)){
 drop_subj <- subj_inclusion$ID[which(subj_inclusion$include == 0)]
 
 cat(paste('\nDropped subjects because > 2 missing or dropped datapoints, N = ', length(drop_subj)))
-cat(paste('\nDropped subject(s): ',drop_subj))
+cat(paste('\nDropped subject(s): ',length(drop_subj)))
 
 # Remove these subjects from particdat, data1, data2, alltask and alltaskall
 particdat <- particdat[-which(particdat$ID %in% drop_subj), ] 
@@ -361,7 +367,9 @@ behav_tests <- data.frame(
 )
 
 for (i in 1:length(cols_to_test)){
-  my_test <- t.test(behavdat[which(particdat$handcode == 1), cols_to_test[i]], behavdat[which(particdat$handcode == 2), cols_to_test[i]], paired = FALSE)
+  my_test <- t.test(behavdat[which(particdat$handcode == 1), cols_to_test[i]], 
+                    behavdat[which(particdat$handcode == 2), cols_to_test[i]], 
+                    paired = FALSE)
   behav_tests$df[i] <- my_test$parameter
   behav_tests$t[i] <- my_test$statistic
   behav_tests$p[i] <- my_test$p.value
@@ -374,11 +382,48 @@ if (length(which(behav_tests$p < corrected_alpha)) > 0){
   print(behav_tests$Measure[which(behav_tests$p < corrected_alpha)])
 }
 if (length(which(behav_tests$p < corrected_alpha)) == 0){
-  cat(paste0('No significant difference between left and right handers observed for number of words, RT or Accuracy on any task'))
+  cat(paste0('\nNo significant difference between left and right handers observed for number of words, RT or Accuracy on any task'))
   cat(paste0('p > ', round(min(behav_tests$p), 4), ' in all cases.'))
 }
 
 kable(behav_tests)
+```
+
+## Behavioural Test-rest reliablity
+
+This chunk checks whether there are any test-retest differences in behavioural measures. Wilcoxon tests are used as measures are unlikely to be normally distributed.
+
+```{r behav-retest}
+# Test-retest comparisons for behavioural data
+cols_to_test <- c(word.cols, acc.cols, rt.cols)
+cols_to_test <- cols_to_test[seq(from = 1, to = length(cols_to_test)-1, by = 2)]
+behav_measures <- length(cols_to_test)  # Number of tests performed
+
+behav_retest <- data.frame(matrix(NA,nrow=behav_measures,ncol=3))
+colnames(behav_retest)<-c('Measure','V','p')
+behav_retest$Measure <- colnames(behavdat)[cols_to_test]
+
+myrow <- 0
+# Loop through measures
+for (m in 1:behav_measures){
+  myrow <- myrow+1
+  col1 <- cols_to_test[m]
+  col2 <- cols_to_test[m] + 1
+  # Perform Wilcoxen test
+  my_test <- wilcox.test(behavdat[ , col1],  # Session 1
+                          behavdat[ , col2],  # Session 2
+                          paired = TRUE) 
+  # Organise output
+  behav_retest$V[myrow] <- round(my_test$statistic, 2)
+  behav_retest$p[myrow] <- round(my_test$p.value, 3)
+}
+
+# Report results
+corrected_alpha <- .05 / behav_measures
+sig_count <- length(which(behav_retest$p < corrected_alpha))
+cat(paste('Number of tasks with significant test-retest behavioural differences: ', sig_count))
+if (sig_count > 0){cat('\nCheck behav_retest for details')}
+
 ```
 
 ## Calculate means of LI values, check normality and create pirate plot
@@ -541,7 +586,44 @@ ggsave(filename = 'My_pirate.png', plot = my_pirate, width = 8, height = 4)
 # Holy moly that was a lot of work for one plot
 ```
 
-## Correlation matrix
+
+## LI Test-rest reliablity
+
+This chunk checks whether there are any test-retest differences in LI values
+
+```{r LI-retest}
+# Test-retest comparisons of LI values
+LI_retest <- data.frame(matrix(NA,nrow=12,ncol=5))
+colnames(LI_retest)<-c('Hand','Task','t','df','p')
+LI_retest$Hand <- rep(c(1,2),each=6)
+LI_retest$Task <- rep(myshortlab,2)
+
+myrow <- 0
+# Loop through groups
+for (h in 1:2) {
+  handedness_rows <- which(particdat$handcode == h)
+  # Loop through tasks
+  for (t in 1:6){
+    myrow <- myrow+1
+    # Perform t-test
+    my_test <- t.test(alltask[handedness_rows, t],    # Session 1
+                      alltask[handedness_rows, t+6],  # Session 2
+                      paired = TRUE)
+    # Organise output
+    LI_retest$t[myrow] <- round(my_test$statistic, 2)
+    LI_retest$df[myrow] <- my_test$parameter
+    LI_retest$p[myrow] <- round(my_test$p.value, 3)
+  }
+}
+
+sig_count <- length(which(LI_retest$p < .05))
+cat(paste('Number of tasks with significant test-retest LI differences: ', sig_count))
+if (sig_count > 0){cat('\nCheck LI_retest for details')}
+
+```
+
+
+## LI correlation matrix
 
 
 ```{r corrheat,fig.height=6,figwidth=10}
