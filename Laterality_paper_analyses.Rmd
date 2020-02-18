@@ -444,6 +444,8 @@ myrow<-0
 
 # Normality tests and plots
 for (i in 1:6){ # Loop through tasks
+  my_fig_name <- paste0('Supp_Fig_1', LETTERS[i], '.png')
+  png(my_fig_name, width=8, height=6, units="in", res=300)
   par(mfrow=c(2,4))
   
   for (j in 1:2){ # Loop through sessions
@@ -457,6 +459,7 @@ for (i in 1:6){ # Loop through tasks
       myshap<-shapiro.test(tempdata)
       
       # Histogram
+      
       plot (density (tempdata, na.rm = TRUE),
             main = paste (handedness_text, '_', mylabels[(i + offset)]),
             xlim = c(-6, 8), ylim = c(0, 0.4))
@@ -471,14 +474,16 @@ for (i in 1:6){ # Loop through tasks
       shapdf$Session[myrow] <- j
       shapdf$Hand[myrow] <- h
       shapdf$p[myrow] <- round(myshap$p.value, 3)
+      
     } # Hand loop
   } # Session loop
+  dev.off()
 } # Task loop
 
   
 # One-sample t-tests to compare LI to zero
-LI_ttests<-data.frame(matrix(NA,nrow=24,ncol=8))
-colnames(LI_ttests)<-c('Taskcode','Session','Hand','t','df','p','LI','lab')
+LI_ttests<-data.frame(matrix(NA,nrow=24,ncol=10))
+colnames(LI_ttests)<-c('Taskcode','Session','Hand','mean','sd','t','df','p','LI','lab')
 
 LI_ttests$Session <- rep(c(1,2),6)
 LI_ttests$Task <- rep(myshortlab,each=2)
@@ -502,6 +507,8 @@ for (h in c(1,2)){ # Loop through handedness
       LI_ttests$Taskcode[myrow] <- LETTERS[t]
       LI_ttests$Session[myrow] <- s
       LI_ttests$Hand[myrow] <- handedness[h]
+      LI_ttests$mean[myrow] <- round(mean(alltask[handedness_rows, mycol], na.rm = TRUE), 2)
+      LI_ttests$sd[myrow] <- round(sd(alltask[handedness_rows, mycol], na.rm = TRUE), 2)
       LI_ttests$t[myrow] <-round(my_test$statistic,2)
       LI_ttests$df[myrow] <-my_test$parameter
       LI_ttests$p[myrow] <-round(my_test$p.value,3)
@@ -1129,13 +1136,13 @@ abline(v=37.5, lty=2)
 text(x = 10, y = 0.14, labels = 'black = right handed\nred = left handed')
 cat('Influential points are:') # These values are ROW NUMBERS not PARTICIPANT IDs
 w
-alltask$bivoutlier <-0
-alltask$bivoutlier[w] <-1
+alltask$bivoutlier <-1
+alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
 png('My_facscores.png', width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
-plot(alltask$f1score,alltask$f2score,pch=(15+alltask$bivoutlier),col=particdat$handcode,
+plot(alltask$f1score,alltask$f2score, pch=alltask$bivoutlier, col=particdat$handcode, 
      xlab='Factor 1',ylab='Factor 2', xlim=c(-30, 30))
 abline(v=0,lty=2)
 abline(h=0,lty=2)
@@ -1144,7 +1151,8 @@ mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use='pai
 text(-14, 13, paste('Right Handers: r = ',mycor_RH))
 text(-14, 20, paste('Left Handers: r = ',mycor_LH), col='red')
 pData<-cbind(alltask,particdat)
-covEllipses(x=pData[,c('f1score','f2score')],group=pData$handcode,pooled=FALSE,add=TRUE,col=c("black","red"),labels="")
+covEllipses(x=pData[,c('f1score','f2score')], group=pData$handcode, 
+            pooled=FALSE, add=TRUE, col=c("black","red"), labels="")
 
 dev.off()
 ```
