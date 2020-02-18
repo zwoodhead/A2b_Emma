@@ -989,7 +989,7 @@ myhighCI <- real_est_path + 1.96*real_est_se
 # Bear in mind that if you change the winning model, the indices below will also need to change!!
 
 Factor1_plot_data = data.frame(
-  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Task' = rep(c('A','B','C','D','E','F'), 2),
   'Group' = rep(c('Left Handed', 'Right Handed'), each = 6), # Left handers first to make the plot work
   'Loading' = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
                 real_est_path[1:3],1,real_est_path[4:5]),    # Factor 1 loadings, RH
@@ -998,14 +998,14 @@ Factor1_plot_data = data.frame(
   'highCI' = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
                myhighCI[1:3],1,myhighCI[4:5])                # Factor 1 high CI, RH
 )
-Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('A','B','C','D','E','F'))
 Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
 Factor1_plot_data$Factor<-rep('Factor 1',length(Factor1_plot_data[,1]))
 
 #=================================================================================#
 # Select Factor 2 loadings for plotting
 Factor2_plot_data = data.frame(
-  'Task' = rep(c('LG','PD','SD','SG','SC','JD'), 2),
+  'Task' = rep(c('A','B','C','D','E','F'), 2),
   'Group' = rep(c('Left Handed','Right Handed'), each = 6),
   'Loading' = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
                 real_est_path[6:8],0,real_est_path[9:10]), # Right Handers factor 1 loadings
@@ -1015,7 +1015,7 @@ Factor2_plot_data = data.frame(
                myhighCI[6:8],0,myhighCI[9:10])
 )
 
-Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('LG','PD','SD','SG','SC','JD'))
+Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('A','B','C','D','E','F'))
 Factor2_plot_data$Group <- factor(Factor2_plot_data$Group)
 Factor2_plot_data$Factor<-rep('Factor 2',length(Factor2_plot_data[,1]))
 
@@ -1132,19 +1132,21 @@ w
 alltask$bivoutlier <-0
 alltask$bivoutlier[w] <-1
 
-#make plot, showing outliers and left-handers
+# Make My_facscores.png plot, showing outliers and left-handers
+png('My_facscores.png', width=6, height=5, units="in", res=300)
+par(mar = c(4.5, 4.1, 1, 1))
 plot(alltask$f1score,alltask$f2score,pch=(15+alltask$bivoutlier),col=particdat$handcode,
      xlab='Factor 1',ylab='Factor 2', xlim=c(-30, 30))
 abline(v=0,lty=2)
 abline(h=0,lty=2)
 mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use='pairwise.complete.obs'), 3)
 mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use='pairwise.complete.obs'), 3)
-text(-12,20,paste('Right Handers: r = ',mycor_RH))
-text(-12                 
-     ,13,paste('Left Handers: r = ',mycor_LH), col='red')
+text(-14, 13, paste('Right Handers: r = ',mycor_RH))
+text(-14, 20, paste('Left Handers: r = ',mycor_LH), col='red')
 pData<-cbind(alltask,particdat)
 covEllipses(x=pData[,c('f1score','f2score')],group=pData$handcode,pooled=FALSE,add=TRUE,col=c("black","red"),labels="")
 
+dev.off()
 ```
 
 
