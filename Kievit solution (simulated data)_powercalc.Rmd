@@ -122,7 +122,7 @@ fit1A <- cfa(model1, data=sims$data_null)
 fit2A <- cfa(model2, data=sims$data_null)
 fit3A <- cfa(model3, data=sims$data_null)
 
-#aic_vector1 <- c(fitMeasures(fit1A, "aic"),fitMeasures(fit1A, "aic"),fitMeasures(fit1A, "aic"))
+#aic_vector1 <- c(fitMeasures(fit1A, "aic"),fitMeasures(fit2A, "aic"),fitMeasures(fit3A, "aic"))
 
 fit1B <- cfa(model1, data=sims$data_language)
 fit2B <- cfa(model2, data=sims$data_language)
