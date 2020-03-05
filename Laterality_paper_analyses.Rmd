@@ -274,6 +274,41 @@ nsubj_final <- dim(data1)[1]
 cat(paste('\nFinal number of subjects: ', nsubj_final))
 ```
 
+Calculate laterality categories
+
+```{r lat_cat}
+# Function to calculate laterality categories from LI and SE
+calculate_cat <- function(myLI, mySE){
+  myside <- 1
+  my_cat <- 1
+  if(myLI < 0){
+    myside <- -1
+    my_cat <- -1
+    myLI <- myLI * -1 # flip LI so test works
+  }
+  if((myLI - mySE*1.96) < 0){ my_cat <- 0}
+  return(my_cat)
+}
+
+# Calculate laterality categories for all subjects
+alltasklat <- matrix(data=NA, nrow=dim(alltask)[1], ncol = dim(alltask)[2])
+for (s in 1:dim(alltask)[1]){ # subject loop
+  for (t in 1:dim(alltask)[2]){ # task loop
+    if (is.na(alltask[s,t]) == FALSE){
+      
+      my_cat <- calculate_cat(alltask[s,t], allse[s,t])
+      alltasklat[s,t] <- my_cat
+    }
+  }
+}
+
+colnames(alltasklat)<-mylabels
+#recode so that 1 = R, 2= bilateral, 3 = left
+alltasklat<-alltasklat+2
+
+```
+
+
 ## Report demographic summary statistics for all INCLUDED participants
 I.e omitting participants who have been excluded from the analysis as described above.
 
