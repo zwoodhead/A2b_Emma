@@ -1,0 +1,163 @@
+---
+title: "Laterality_Paper2-power"
+author: "Zoe Woodhead & Paul Thompson"
+date: "28/02/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Set variables and load packages
+
+```{r settings, warning=FALSE, message=FALSE}
+
+require(tidyverse)
+library(MASS)
+options(scipen=999)
+```
+
+
+# Structural Equation Modeling
+
+## Simulate data
+
+```{r sim_dat}
+#========================================================================#
+# simulate multivariate normal data to test ESEM model on three outcomes.#
+#========================================================================#
+
+sim_data<-function(n=300)
+{
+
+sig1 <- matrix(c(1,	0.7,	0,	0,	0,	0,
+                 0.7, 1, 0, 0, 0, 0,
+                 0, 0, 1, 0.7, 0, 0,
+                 0, 0, 0.7, 1, 0, 0,
+                 0,0,0,0,1,0.7,
+                 0,0,0,0,0.7,1),6,6,byrow=TRUE)
+
+data_null <- mvrnorm(n=n, mu = c(5,5,5,5,5,5), Sigma=sig1)
+
+#========================================================================#
+
+sig2 <- matrix(c(1,	0.7,	0.4,	0.4,	0,	0,
+                 0.7, 1, 0.4, 0.4, 0, 0,
+                 0.4, 0.4, 1, 0.7, 0, 0,
+                 0.4, 0.4, 0.7, 1, 0, 0,
+                 0,0,0,0,1,0.7,
+                 0,0,0,0,0.7,1),6,6,byrow=TRUE)
+
+data_language <- mvrnorm(n=n, mu = c(5,5,5,5,5,5), Sigma=sig2)
+
+#========================================================================#
+
+sig3 <- matrix(c(1,	0.7, 0.4,	0.4, 0.4, 0.4,
+                 0.7, 1, 0.4, 0.4, 0.4, 0.4,
+                 0.4, 0.4, 1, 0.7, 0.4, 0.4,
+                 0.4, 0.4, 0.7, 1, 0.4, 0.4,
+                 0.4,0.4,0.4,0.4,1,0.7,
+                 0.4,0.4,0.4,0.4,0.7,1),6,6,byrow=TRUE)
+
+data_genLAT <- mvrnorm(n=n, mu = c(5,5,5,5,5,5), Sigma=sig3)
+
+#========================================================================#
+
+data_null<-as.data.frame(data_null)
+data_language<-as.data.frame(data_language)
+data_genLAT<-as.data.frame(data_genLAT)
+
+names(data_null)<-names(data_language)<-names(data_genLAT)<-c("dichotic1","dichotic2","rhyme1","rhyme2","faces1","faces2")
+
+data_null<-data_null[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+data_language<-data_language[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+data_genLAT<-data_genLAT[,c("dichotic1","rhyme1","faces1","dichotic2","rhyme2","faces2")]
+
+return(list(data_null=data_null,data_language=data_language,data_genLAT=data_genLAT))
+}
+#========================================================================#
+```
+
+## Roger Kievit's suggestion - modelling data with three prespecified covariance structures, then compare using AIC weights.
+
+This is a subset of SEM that dos not include any latent variables or directional paths. It only looks to constrain particular covariance patterns and report 'best' model according AIC weights.
+
+```{r Roger_mod}
+library(lavaan)
+library(qpcR)
+library(tidyverse)
+library(semPlot)
+
+sem_pwr_cov<-function(n=300,Niters=100)
+{
+
+  LLR_testB <- vector(mode="numeric", length=100)
+  LLR_testC <- vector(mode="numeric", length=100)
+  
+  for(i in 1:Niters)
+{
+sims <- sim_data(n=n)
+
+model1<-"
+dichotic1~~0*rhyme1
+dichotic1~~0*faces1 
+rhyme1~~0*faces1 
+"
+
+model2<-"
+dichotic1~~rhyme1 
+dichotic1~~0*faces1
+rhyme1~~0*faces1 
+"
+
+model3<-"
+dichotic1~~rhyme1 
+dichotic1~~faces1 
+rhyme1~~faces1
+"
+
+fit1A <- cfa(model1, data=sims$data_null)
+fit2A <- cfa(model2, data=sims$data_null)
+fit3A <- cfa(model3, data=sims$data_null)
+
+#aic_vector1 <- c(fitMeasures(fit1A, "aic"),fitMeasures(fit2A, "aic"),fitMeasures(fit3A, "aic"))
+
+fit1B <- cfa(model1, data=sims$data_language)
+fit2B <- cfa(model2, data=sims$data_language)
+fit3B <- cfa(model3, data=sims$data_language)
+
+#aic_vector2 <- c(fitMeasures(fit1B, "aic"),fitMeasures(fit2B, "aic"),fitMeasures(fit3B, "aic"))
+
+fit1C <- cfa(model1, data=sims$data_genLAT)
+fit2C <- cfa(model2, data=sims$data_genLAT)
+fit3C <- cfa(model3, data=sims$data_genLAT)
+
+# aic_vector3 <- c(fitMeasures(fit1C, "aic"),fitMeasures(fit2C, "aic"),fitMeasures(fit3C, "aic"))
+# 
+# 
+# AICweights1<-akaike.weights(aic_vector1)$weights
+# AICweights2<-akaike.weights(aic_vector2)$weights
+# AICweights3<-akaike.weights(aic_vector3)$weights
+# 
+# IC_objectweights1<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights1)
+# IC_objectweights2<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights2)
+# IC_objectweights3<-data.frame(Model=factor(rep(c('Model 1','Model 2','Model 3'))), IC = factor(rep('AIC',each=3)),values=AICweights3)
+
+LLR_testB[i] <- anova(fit1B,fit2B,fit3B)$`Pr(>Chisq)`[3]
+LLR_testC[i] <- anova(fit1C,fit2C,fit3C)$`Pr(>Chisq)`[3]
+}
+
+LLR_testB_ind<-ifelse(LLR_testB>=0.05,0,1)
+LLR_testC_ind<-ifelse(LLR_testC>=0.05,0,1)
+  
+hyp1_pwr = mean(LLR_testB_ind)
+hyp2_pwr = mean(LLR_testC_ind)
+
+return(list(hypothesis1_pwr=hyp1_pwr,hypothesis2_pwr=hyp2_pwr,LLR_testB=LLR_testB,LLR_testC=LLR_testC))
+}
+
+sem_pwr_cov(n=80,Niters=100)
+
+```
