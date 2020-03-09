@@ -303,9 +303,26 @@ for (s in 1:dim(alltask)[1]){ # subject loop
 }
 
 colnames(alltasklat)<-mylabels
+alltasklat <- as.data.frame(alltasklat)
 #recode so that 1 = R, 2= bilateral, 3 = left
 alltasklat<-alltasklat+2
 
+# Code consistent / inconsistent categories over time
+lat_consistency <- data.frame(
+  A = rep(1, length(particdat$ID)), 
+  B = rep(1, length(particdat$ID)),
+  C = rep(1, length(particdat$ID)),
+  D = rep(1, length(particdat$ID)),
+  E = rep(1, length(particdat$ID)),
+  F = rep(1, length(particdat$ID))
+)
+
+lat_consistency$A[which(alltasklat$ListGen1 != alltasklat$ListGen2)] <- 0
+lat_consistency$B[which(alltasklat$PhonDec1 != alltasklat$PhonDec2)] <- 0
+lat_consistency$C[which(alltasklat$SemDec1 != alltasklat$SemDec2)] <- 0
+lat_consistency$D[which(alltasklat$SentGen1 != alltasklat$SentGen2)] <- 0
+lat_consistency$E[which(alltasklat$SentComp1 != alltasklat$SentComp2)] <- 0
+lat_consistency$F[which(alltasklat$Jabber1 != alltasklat$Jabber2)] <- 0
 ```
 
 
@@ -566,12 +583,27 @@ ID_data <- data.frame(
   ID = as.factor(particdat$ID),
   Hand = as.factor(particdat$handedness))
 pirate_data <- cbind(ID_data, alltaskall)
+#colnames(pirate_data)[15:26] <- c('A1_cat', 'B1_cat', 'C1_cat', 'D1_cat', 'E1_cat', 'F1_cat',
+#                                  'A2_cat', 'B2_cat', 'C2_cat', 'D2_cat', 'E2_cat', 'F2_cat')
 
 LI_long <- melt(pirate_data, value.name = 'LI') #version with outliers 
 LI_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
 LI_long$Task <- rep(rep(myshortlab, each=nsubj_final), 2)
 LI_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = nsubj_final), 2)
 levels(LI_long$Hand) <- c('Left Handed','Right Handed')
+
+# Add laterality categories
+category_data <- cbind(ID_data, alltasklat)
+category_long <- melt(category_data)
+colnames(category_long) <- c('ID','Hand','Task','Category')
+category_long$Category[which(category_long$Category != 2)] <- 1
+category_long$Category[which(category_long$Category == 2)] <- 0
+category_long$Hand <- LI_long$Hand
+category_long$Task <- rep(rep(c('A','B','C','D','E','F'), each = nsubj_final), 2)
+category_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
+category_long$LI <- LI_long$LI
+category_long$Category <- as.factor(category_long$Category)
+levels(category_long$Category) <- c(1, 16)
 
 # Also identify excluded data points (NAs in alltask)
 NA_data <- cbind(ID_data, alltask)
@@ -601,7 +633,7 @@ my_pirate = ggplot(data = LI_long,
                    mapping = aes(x = Taskcode,
                                  y = LI,
                                  colour = Session)) +
- geom_pirate_ZW(points_params = list(shape = 16, alpha = 0.5),
+ geom_pirate_ZW(points_params = list(alpha = 0),
                  bars = FALSE,
                  #bars_params = list(width = 3),
                  #violins_params = list(width = 3),
@@ -617,9 +649,15 @@ my_pirate = ggplot(data = LI_long,
   # Asterisks for significant LI values
   geom_text(data = LI_ttests, aes(x = Taskcode, group = Session, y = LI, label = lab),
             position = position_dodge(0.7), colour = 'black') +
-  # Red points for outlier datapoints
+  # Coded points for laterality categories
+  geom_point(data = category_long, aes(x = Task, group = Session, y = LI, shape = Category),
+             position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.7),
+             size = 1.2, alpha = 0.6, na.rm = TRUE) +
+  scale_shape_manual(values = c(1, 16), 
+                     name = 'Lateralisation', labels = c('Non-lateralised', 'Lateralised')) +
+  # Black points for outlier datapoints
   geom_point(data = NA_long, aes(x = Taskcode, group = Session, y = LI),
-             position = position_dodge(0.7), colour = 'black', size = 0.8)
+             position = position_dodge(0.7), colour = 'black', size = 1)
 
 print(my_pirate)
 
@@ -1327,16 +1365,19 @@ cat('Do factor scores vary with handedness?','\n')
 cat('FACTOR 1: ', apa_PT(t.test(alltask$f1score~particdat$handcode)),'\n')
 cat('FACTOR 2: ', apa_PT(t.test(alltask$f2score~particdat$handcode)),'\n')
 cat('\n')
-# Count how many tasks a subject is left lateralised for
-for (i in 1:nrow(alltask)){
-  alltask$Nleftlat[i]<-length(which(c(taskA_LG[i], taskB_PD[i], taskC_SD[i],
-                                      taskD_SG[i], taskE_SC[i], taskF_JD[i])>0))
-}
+
+# # Count how many tasks a subject is left lateralised for
+# for (i in 1:nrow(alltask)){
+# 
+#   
+#   alltask$Nleftlat[i]<-length(which(c(taskA_LG[i], taskB_PD[i], taskC_SD[i],
+#                                       taskD_SG[i], taskE_SC[i], taskF_JD[i])>0))
+# }
 
 # Does the number of left lateralised tasks per participant vary with handedness?
-cat('Does the number of left lateralised tasks per participant vary with handedness?','\n')
-kable(table(alltask$Nleftlat,particdat$handcode))
-cat(apa_PT(t.test(alltask$Nleftlat~particdat$handcode)),'\n')
+# cat('Does the number of left lateralised tasks per participant vary with handedness?','\n')
+# kable(table(alltask$Nleftlat,particdat$handcode))
+# cat(apa_PT(t.test(alltask$Nleftlat~particdat$handcode)),'\n')
 
   
   # # Not sure what this is doing....
