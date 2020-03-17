@@ -267,7 +267,7 @@ nsubj_final <- dim(data1)[1]
 cat(paste('\nFinal number of subjects: ', nsubj_final))
 ```
 
-## Report demographic summary statistics for all INCLUDED participants
+## Report demographic summary statistics for all INCLUDED participants (Table 1)
 I.e omitting participants who have been excluded from the analysis as described above.
 
 ```{r demographics}
@@ -378,7 +378,7 @@ print(stacklat)
 
 Behavioural task data includes responses the participants made during the task, i.e. reaction times and accuracy for decision tasks, or the number of words produced for speech generation tasks.
 
-The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
+The following chunk reports summary statistics for these behavioural measures (as shown in Table 2) and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
 
 ```{r behaviouraldata}
 behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
@@ -503,11 +503,11 @@ if (sig_count > 0){cat('\nCheck behav_retest for details')}
 
 ```
 
-## Calculate means of LI values, check normality and create pirate plot
+## Calculate means of LI values, check normality and create pirate plot (Figure 2)
 
 The fTCD data is analysed (in another script) to produce laterality indices (LI values) for each task in each session. The LI values are used subsequently in the SEM analysis.
 
-The following chunk reports summary statistics and produces a plot of the LI values.
+The following chunk reports summary statistics and produces a pirate plot of the LI values (Figure 2).
 
 ```{r LI_means, warning=FALSE}
 # Modified script for ggpirate plot
@@ -607,9 +607,7 @@ LI_ttests$Hand <- as.factor(LI_ttests$Hand)
 ID_data <- data.frame(
   ID = as.factor(particdat$ID),
   Hand = as.factor(particdat$handedness))
-pirate_data <- cbind(ID_data, alltaskall)
-#colnames(pirate_data)[15:26] <- c('A1_cat', 'B1_cat', 'C1_cat', 'D1_cat', 'E1_cat', 'F1_cat',
-#                                  'A2_cat', 'B2_cat', 'C2_cat', 'D2_cat', 'E2_cat', 'F2_cat')
+pirate_data <- cbind(ID_data, alltask)
 
 LI_long <- melt(pirate_data, value.name = 'LI') #version with outliers 
 LI_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
@@ -631,30 +629,30 @@ category_long$Category <- as.factor(category_long$Category)
 category_long <- category_long[-which(is.na(category_long$Category)), ]
 levels(category_long$Category) <- c(1, 16)
 
-# Also identify excluded data points (NAs in alltask)
-NA_data <- cbind(ID_data, alltask)
-NA_long <- melt(NA_data, value.name = 'LI_NA')
-NA_long[ , 5:8] <- LI_long[ , 4:7]
-levels(NA_long$Hand) <- c('Left Handed','Right Handed')
+# # Also identify excluded data points (NAs in alltask)
+# NA_data <- cbind(ID_data, alltask)
+# NA_long <- melt(NA_data, value.name = 'LI_NA')
+# NA_long[ , 5:8] <- LI_long[ , 4:7]
+# levels(NA_long$Hand) <- c('Left Handed','Right Handed')
+# 
+# #add dummy rows to make the plot jitter work
+# extra_data <- data.frame(matrix(20, nrow=2, ncol=14))
+# colnames(extra_data) <- c('ID','Hand',colnames(alltask))  
+# extra_data$ID <- as.factor('dummy')
+# extra_data$Hand <- as.factor(c('L','R'))
+# extra_long <- melt(extra_data, value.name = 'LI_NA')
+# extra_long$Session <- as.factor(c(rep(1, 2*6), rep(2, 2*6)))
+# extra_long$Task <- rep(rep(myshortlab, each=2), 2)
+# extra_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = 2), 2)
+# levels(extra_long$Hand) <- c('Left Handed','Right Handed')
+# extra_long$LI_NA <- NA
+# extra_long$LI <- NA
+# 
+# # Combine with NA_long, and select only rows with excluded datapoints
+# NA_long <- rbind(NA_long, extra_long)
+# NA_long <- NA_long[which(is.na(NA_long$LI_NA)), ]
 
-#add dummy rows to make the plot jitter work
-extra_data <- data.frame(matrix(20, nrow=2, ncol=14))
-colnames(extra_data) <- c('ID','Hand',colnames(alltask))  
-extra_data$ID <- as.factor('dummy')
-extra_data$Hand <- as.factor(c('L','R'))
-extra_long <- melt(extra_data, value.name = 'LI_NA')
-extra_long$Session <- as.factor(c(rep(1, 2*6), rep(2, 2*6)))
-extra_long$Task <- rep(rep(myshortlab, each=2), 2)
-extra_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = 2), 2)
-levels(extra_long$Hand) <- c('Left Handed','Right Handed')
-extra_long$LI_NA <- NA
-extra_long$LI <- NA
-
-# Combine with NA_long, and select only rows with excluded datapoints
-NA_long <- rbind(NA_long, extra_long)
-NA_long <- NA_long[which(is.na(NA_long$LI_NA)), ]
-
-# Make pirate plot
+# Make pirate plot (Figure 2)
 my_pirate = ggplot(data = LI_long,
                    mapping = aes(x = Taskcode,
                                  y = LI,
@@ -680,14 +678,14 @@ my_pirate = ggplot(data = LI_long,
              position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.7),
              size = 1.2, alpha = 0.8, na.rm = TRUE) +
   scale_shape_manual(values = c(1, 19), 
-                     name = 'Lateralisation', labels = c('Non-lateralised', 'Lateralised')) +
+                     name = 'Lateralisation', labels = c('Non-lateralised', 'Lateralised'))
   # Black points for outlier datapoints
-  geom_point(data = NA_long, aes(x = Taskcode, group = Session, y = LI),
-             position = position_dodge(0.7), colour = 'black', size = 1.4, pch=18)
+  # geom_point(data = NA_long, aes(x = Taskcode, group = Session, y = LI),
+  #           position = position_dodge(0.7), colour = 'black', size = 1.4, pch=18)
 
 print(my_pirate)
 
-ggsave(filename = 'My_pirate.png', plot = my_pirate, width = 8, height = 4)
+ggsave(filename = 'Figure2.png', plot = my_pirate, width = 8, height = 4)
 
 # Holy moly that was a lot of work for one plot
 ```
@@ -729,7 +727,7 @@ if (sig_count > 0){cat('\nCheck LI_retest for details')}
 ```
 
 
-## LI correlation matrix
+## LI correlation matrix (Figure 3)
 
 
 ```{r corrheat,fig.height=6,figwidth=10}
@@ -796,11 +794,11 @@ my_cormat <- ggheatmap +
 
 print(my_cormat)
 
-ggsave(filename = 'My_cormat.png', dpi=300, plot = my_cormat, width = 10, height = 6)
+ggsave(filename = 'Figure3.png', dpi=300, plot = my_cormat, width = 10, height = 6)
 ```
 
 
-##Check reason for test-retest reliability issues in right handers
+##Check reason for test-retest reliability issues in right handers and make scatterplot (Figure 4)
 
 ```{r retestscatter, warnings = FALSE}
 scatter1 <- alltask[ , 1:6] %>% gather(key = Task, value = Session1)
@@ -818,7 +816,7 @@ myscatter <- ggplot(data = scatterdata, aes(x = Session1, y = Session2, colour =
 
 print(myscatter)
 
-ggsave(filename = 'My_scatter.png', dpi=300, plot = myscatter, width = 10, height = 6)
+ggsave(filename = 'Figure4.png', dpi=300, plot = myscatter, width = 10, height = 6)
 ```
 
 
@@ -1063,7 +1061,7 @@ anova(Model2_unc_mg, Model2_con_mg)
 
 Conclusion: For the 2 factor model, the unconstrained model IS significantly better than the constrained model, but the effect is small. The (cautious) conclusion is that for this model, there is a difference between the factor loadings for the left and right handed groups.
 
-### Plotting results of the winning SEM model
+### Plotting results of the winning SEM model (Figure 5)
 
 The remaining analyses will focus on the model with the strongest evidence: 2 factor model where factor loadings could differ between left and right handed groups (unconstrained)
 
@@ -1138,11 +1136,11 @@ my_factor_both <- ggplot(Factor_plot_data, aes(x = Task, y = Loading, fill = Tas
   facet_grid(Factor~Group) + theme(legend.position='none')
 
 print(my_factor_both)
-ggsave(filename = 'My_factors.png', dpi=300, plot = my_factor_both, width = 6, height = 5) 
+ggsave(filename = 'Figure5.png', dpi=300, plot = my_factor_both, width = 6, height = 5) 
 ```
 
 
-## Make factor scores and plot them
+## Make factor scores and plot them (Figure 6)
 
 ```{r makefacscores}
 
@@ -1239,7 +1237,7 @@ alltask$bivoutlier <-1
 alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
-png('My_facscores.png', width=6, height=5, units="in", res=300)
+png('Figure6.png', width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
 plot(alltask$f1score,alltask$f2score, pch=alltask$bivoutlier, col=particdat$handcode, 
      xlab='Factor 1',ylab='Factor 2', xlim=c(-30, 30))
