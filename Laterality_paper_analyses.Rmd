@@ -13,12 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 This script reads in data from A2 study (from dropbox) and new data acquired at Bangor (stored locally), and performs basic summary statistics followed by SEM analysis of the laterality indices.
 
 *Before you start*
-The following files need to downloaded from OSF (https://osf.io/qetj5/files/) and saved to the working directory:
-
-*A2_Participant_Info_Bangor.csv
-*Bangor_Results_Session1.csv
-*Bangor_Results_Session2.csv
-*A2_Behavioural_Data_Bangor.csv
 The following script needs to be pulled from github:
 *geom_pirate_ZW.R
 The following package needs to be installed manually:
@@ -67,7 +61,7 @@ library(heplots)
 
 ```{r participants}
 particdat_A2    <- read.csv('https://osf.io/5jt6q/download')
-particdat_Bangor<- read.csv('A2_Participant_Info_Bangor.csv',header=TRUE) 
+particdat_Bangor<- read.csv('https://osf.io/534jc/download') 
 
 incomplete <- which(particdat_Bangor$Complete == 0)
 nincomplete <- length(incomplete)
@@ -124,8 +118,8 @@ If a participant has missing data for more than one task, that participant will 
 data1_A2 <- read.csv('https://osf.io/afv4h/download')
 data2_A2 <- read.csv('https://osf.io/hzswc/download')
 
-data1_Bangor <- read.csv('Bangor_Results_Session1.csv',stringsAsFactors=FALSE) #changed from read.csv to avoid creating factors!
-data2_Bangor <- read.csv('Bangor_Results_Session2.csv',stringsAsFactors=FALSE)
+data1_Bangor <- read.csv('https://osf.io/cb583/download') #changed from read.csv to avoid creating factors!
+data2_Bangor <- read.csv('https://osf.io/f7szu/download')
 
 data1 <- rbind(data1_A2, data1_Bangor)
 data2 <- rbind(data2_A2, data2_Bangor)
@@ -215,7 +209,6 @@ data2 <- data2[-which(data2$Filename %in% drop_subj), ]
 After dropping tasks and subjects due to missing data (above), we now look at the standard error of the trial by trial data for each subject. If a subject has unusually high standard error for a particular task (using the Hoaglin Iglewicz criterion), their data for that task will be excluded.
 Again, if a participant has excluded data for more than one task, all of the data for that participant will be excluded from the analysis.
 
-
 ```{r exclude, warning=FALSE}
 allse <- cbind(dplyr::select(data1,A1.mean_se,B1.mean_se,C1.mean_se,D1.mean_se,E1.mean_se,F1.mean_se),
                dplyr::select(data2,A2.mean_se,B2.mean_se,C2.mean_se,D2.mean_se,E2.mean_se,F2.mean_se))
@@ -274,7 +267,30 @@ nsubj_final <- dim(data1)[1]
 cat(paste('\nFinal number of subjects: ', nsubj_final))
 ```
 
-Calculate laterality categories
+## Report demographic summary statistics for all INCLUDED participants
+I.e omitting participants who have been excluded from the analysis as described above.
+
+```{r demographics}
+#Participant descriptors reported in paper
+n_info <- particdat %>% group_by(handedness, study, Gender) %>% summarise(n=n()) 
+n_info
+
+gender_by_handedness <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n()) 
+gender_table <- cbind(gender_by_handedness$n[1:2], gender_by_handedness$n[3:4])
+colnames(gender_table) <- c('Left','Right')
+rownames(gender_table) <- c('Female','Male')
+chisq.test(gender_table)
+
+
+age_info <- particdat %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
+print(age_info)
+
+# Do left / right participants differ in age
+t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)], paired = FALSE)
+
+```
+
+## Calculate laterality categories and consistency over sessions
 
 ```{r lat_cat}
 # Function to calculate laterality categories from LI and SE
@@ -307,46 +323,55 @@ alltasklat <- as.data.frame(alltasklat)
 #recode so that 1 = R, 2= bilateral, 3 = left
 alltasklat<-alltasklat+2
 
-# Code consistent / inconsistent categories over time
+# # Code consistent / inconsistent categories over time
 lat_consistency <- data.frame(
-  A = rep(1, length(particdat$ID)), 
-  B = rep(1, length(particdat$ID)),
-  C = rep(1, length(particdat$ID)),
-  D = rep(1, length(particdat$ID)),
-  E = rep(1, length(particdat$ID)),
-  F = rep(1, length(particdat$ID))
+  A = 10 * alltasklat$ListGen1 + alltasklat$ListGen2,
+  B = 10 * alltasklat$PhonDec1 + alltasklat$PhonDec2,
+  C = 10 * alltasklat$SemDec1 + alltasklat$SemDec2,
+  D = 10 * alltasklat$SentGen1 + alltasklat$SentGen2,
+  E = 10 * alltasklat$SentComp1 + alltasklat$SentComp2,
+  F = 10 * alltasklat$Jabber1 + alltasklat$Jabber2
 )
 
-lat_consistency$A[which(alltasklat$ListGen1 != alltasklat$ListGen2)] <- 0
-lat_consistency$B[which(alltasklat$PhonDec1 != alltasklat$PhonDec2)] <- 0
-lat_consistency$C[which(alltasklat$SemDec1 != alltasklat$SemDec2)] <- 0
-lat_consistency$D[which(alltasklat$SentGen1 != alltasklat$SentGen2)] <- 0
-lat_consistency$E[which(alltasklat$SentComp1 != alltasklat$SentComp2)] <- 0
-lat_consistency$F[which(alltasklat$Jabber1 != alltasklat$Jabber2)] <- 0
-```
+#collapse 12/21, 13/31 and 32/23 - we are not interested in order, just whether inconsistent
+for (mycol in 1:6){
+  w <- which(lat_consistency[ , mycol] == 21)
+  lat_consistency[w, mycol] <- 12
+  
+  w <- which(lat_consistency[ ,mycol] == 31)
+  lat_consistency[w, mycol] <- 13
+  
+  w <- which(lat_consistency[ ,mycol] == 32)
+  lat_consistency[w, mycol] <- 23
+}
 
+stacklat <- data.frame(matrix(0, nrow=12, ncol=8))
+colnames(stacklat)<-c('Handedness','Task','LR','LL','LB','BB','RB','RR')
+colnums <- c(13,33,23,22,12,11)
+stacklat$Task <- rep(LETTERS[1:6], 2)
+stacklat$Handedness <- c('Left','','','','','',
+                        'Right','','','','','')
 
-## Report demographic summary statistics for all INCLUDED participants
-I.e omitting participants who have been excluded from the analysis as described above.
+# Count number of participants in each category
+for (hand in 1:2){
+  myrows <- which(particdat$handedness == 'L')
+  myadd <- 0
+  nrows <- length(myrows)
+  
+  if(hand==2){
+    myrows <- which(particdat$handedness == 'R')
+    myadd <- 6
+    nrows <- length(myrows)
+  }
+  for (mycol in 1:6){
+    for (thisnum in 1:6){
+      w <- which(lat_consistency[myrows, mycol] == colnums[thisnum])
+      stacklat[(mycol+myadd), (thisnum+2)] <- round(length(w) / nrows * 100, 0)
+    }
+  }
+}
 
-```{r demographics}
-#Participant descriptors reported in paper
-n_info <- particdat %>% group_by(handedness, study, Gender) %>% summarise(n=n()) 
-n_info
-
-gender_by_handedness <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n()) 
-gender_table <- cbind(gender_by_handedness$n[1:2], gender_by_handedness$n[3:4])
-colnames(gender_table) <- c('Left','Right')
-rownames(gender_table) <- c('Female','Male')
-chisq.test(gender_table)
-
-
-age_info <- particdat %>% summarise(age_mean = mean(Age_m)/12, age_sd = sd(Age_m)/12)
-print(age_info)
-
-# Do left / right participants differ in age
-t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(particdat$handcode==2)], paired = FALSE)
-
+print(stacklat)
 ```
 
 ## Read in and analyse task behavioural data
@@ -357,7 +382,7 @@ The following chunk reports summary statistics for these behavioural measures an
 
 ```{r behaviouraldata}
 behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
-behavdat_Bangor <- read.csv('A2_Behavioural_Data_Bangor.csv') # this file is renamed; was A2_Results_Bangor.xlsx
+behavdat_Bangor <- read.csv('https://osf.io/mzgan/download') # this file is renamed; was A2_Results_Bangor.xlsx
 colnames(behavdat_A2)[1] <- 'ID'
 behavdat <- rbind(behavdat_A2,behavdat_Bangor)
 
