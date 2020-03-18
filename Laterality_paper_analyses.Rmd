@@ -920,10 +920,10 @@ Model2LH <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
 # Model comparison
 
 # Right handers
-mychitest_RH <- mxCompare(Model2RH, Model1RH)
+mychitest_RH <- umxCompare(Model1RH, Model2RH,compareWeightedAIC=TRUE)
 mychitest_RH
 # Left handers
-mychitest_LH <- mxCompare(Model2LH, Model1LH)
+mychitest_LH <- umxCompare(Model1LH, Model2LH,compareWeightedAIC=TRUE)
 mychitest_LH
 
 ```
@@ -1055,7 +1055,10 @@ Model2_con_mg <- umxSuperModel("Model2_constrained", Model2RH_con, Model2LH_con)
 #=================================================================================#
 # Comparison of unconstrained and constrained multigroup models
 
-anova(Model2_unc_mg, Model2_con_mg)
+#anova(Model2_unc_mg, Model2_con_mg)%>% kable()
+
+multi_comp<-umxCompare(Model2_con_mg, Model2_unc_mg,compareWeightedAIC=TRUE)
+multi_comp
 
 ```
 
