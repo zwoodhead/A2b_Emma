@@ -1,0 +1,316 @@
+---
+title: "bilatsim"
+author: "DVM Bishop and Paul Thompson"
+date: "25/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("ggpubr") #for ggdensity function
+require(tidyverse)
+library(cowplot)
+library(diptest)
+library(ggpubr)
+library(knitr)
+library(kableExtra)
+library(matrixStats)
+library(janitor)
+```
+
+## Rationale
+
+If we find that the average LI on a task (such as Jabberwocky) is zero, this could mean one of 2 things.
+A) both sides of the brain participate equally in the task in all people
+B) the population is composed of a 50:50 mix of people who are left vs right-lateralised on the task (to a greater or lesser extent)
+
+I think in the literature on laterality, A is generally assumed. But I think our data show B.
+
+Simulation 1: simulating distribution of categorical laterality if the true situation is bilateral activation.
+So 
+1. simulate LI for individual trials as a random normal deviate with mean zero and SD 1
+2. compute SE for the LI scores for each session
+3. categorise each case as L, Bilateral, R depending on whether the CI crosses zero
+4. consider the distribution of categories for the 2 sessions together
+
+```{r simLI}
+
+simLI<-function(sim_type='B',npartic=1000,mymean=0,ntrial=15,TRT=0.7)
+{
+  library(matrixStats)
+#npartic=1000 #Large N participants simulated so can see distribution of laterality categories
+#nsess=2 #2 sessions
+
+mysim <- data.frame(matrix(NA,nrow=npartic,ncol=5))
+colnames(mysim)<-c('Subject','LI_t1','LI_t2','SE_t1','SE_t2') #,'lowCI','hiCI','Cat','Cat2')
+#ntrial <- 15 #n trials for each session
+thisrow<-0 #row counter for the data frame; incremented for each participant/session
+
+for (p in 1:npartic){
+  mysim$Subject[p]<-p
+  #It's really interesting to vary the value of mymean to see the effect!
+if(sim_type=='B')
+{
+  #use runif to in effect throw a dice and flip sign on the effect for 50% of trials
+if (runif(1)<.5) {mymean <- mymean*-1}
+}
+else{mymean<-0}
+  
+# PT: I have had to change the way that DB simulated the data to allow for the test-retest (TRT) correlation between the time points. The data is simulated in short form then change to long format and we can remove one loop and vectorise some calcs.
+
+LItrial <- MASS::mvrnorm(ntrial,c(mymean,mymean),Sigma=matrix(c(1,TRT,TRT,1),2,2,byrow=TRUE)) #ntrial random normal deviates with mean mymean, SD = 1, and corr = TRT (see arguement inputs.
+
+mysim[p,c('LI_t1','LI_t2')] <- base::colMeans(LItrial)  #LI for that session is mean of individual trial LIs
+mysim[p,c('SE_t1','SE_t2')] <- matrixStats::colSds(LItrial)/sqrt(ntrial) #standard error for session LIs
+}
+
+mysim <- mysim %>% gather(key='ref',value='value',-Subject) %>% extract('ref',c('ref','Session'),"([[:alnum:]]+)_([[:alnum:]]+)")%>% spread('ref','value') 
+
+
+mysim$lowCI <- with(mysim,LI - 1.96*SE) #95% CI lower bound for mean LI
+mysim$hiCI <- with(mysim,LI + 1.96*SE) #95% CI upper bound for mean LI
+#now categorise the mean LI for session as 1 = right, 2 = bilateral, 3 = left
+mysim$Cat<-2  #bilateral is the default
+
+for(j in 1:dim(mysim)[1]){
+
+if (mysim$hiCI[j]<0) {
+  mysim$Cat[j] <-1} #R lateralised if top range of CI is below zero
+if (mysim$lowCI[j]>0) {
+  mysim$Cat[j] <-3} #L lateralised if bottom range of CI is above zero
+}
+
+mysimCat2<-mysim %>%
+   group_by(Subject) %>%
+   summarise(Cat2 = paste(Cat, collapse=''))
+
+mysim$Cat2<-c(sapply(mysimCat2$Cat2, function(x) c(NA,x)))
+
+
+#Now create 2 digit category (e.g. 12, 22, 32) representing category for session 1 + session 2
+#This will be just recorded in the row for session 2
+# mysim$Cat2<-rep(NA,length=dim(mysim)[1])
+# if (mysim$time=='t2'){
+#   mysim$Cat2[j]<-10*mysim$Cat[(j-1)]+mysim$Cat[thisrow]
+#   mysim$CatSD2[j]<-10*mysim$CatSD[(thisrow-1)]+mysim$CatSD[thisrow]
+# }
+
+
+return(mysim)
+}
+
+means=c(0,0.2,0.4)
+mysimA <- simLI(sim_type='A',npartic=1000,mymean=0,ntrial=15,TRT=0.7)
+
+
+for(i in means)
+{
+  nam<-paste0("mysimB_",i)
+assign(nam,simLI(sim_type='B',npartic=1000,mymean=i,ntrial=15,TRT=0.7))
+}
+
+```
+
+```{r freq_tables_sim}
+tabyl(mysimA$Cat2, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+
+tabyl(mysimB_0$Cat2, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+
+tabyl(mysimB_0.2$Cat2, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+
+tabyl(mysimB_0.4$Cat2, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+```{r dist_sims}
+ ggplot(mysimA,aes(x=LI))+geom_density(aes(fill=as.factor(Session),group=as.factor(Session)),alpha=0.5)+theme_bw()+ guides(fill=guide_legend(title="Session"))+theme(legend.position='top')
+
+```
+
+This has really clarified 2 things for me.
+First, as I expected, if we are drawing from a population of values where true mean is zero, then it is not uncommon to find some cases where the category is bilateral in one session and either L or R in the other session (red values). About 16% of values are red.
+But it is vanishingly rare to find cases where the categorisation is LL, LR or RR.
+
+Second, if invididual people really are unlateralised, so drawn from a population with a mean of zero for the LI, then test-retest reliability of the LI will be zero. This is because the only reason for an estimate of LI deviating from zero would be chance.
+I had an intuition this should be the case, which was why I was getting excited about the good test-retest reliability of Jabberwocky. You'd only see that if there was meaningful individual variation in the LI - i.e. although the group mean is zero, the people in the group are reliably left- or right-lateralised.
+
+Now let's try simulating model B
+
+Can use same script - all that changes is the way the random normal deviate is specified.
+In half the people, you have a mean less than zero, and in half a mean greater than zero.
+The results will depend on how large the difference is from zero
+
+
+
+```{r dist_sims2,warning=FALSE,message=FALSE}
+p1<-ggplot(mysimB_0,aes(x=LI))+geom_density(aes(fill=as.factor(Session),group=as.factor(Session)),alpha=0.5)+theme_bw()+ guides(fill=guide_legend(title="Session"))+theme(legend.position='top')+ggtitle(paste0("Model B: meanbias = ",0))
+
+p2<-ggplot(mysimB_0.2,aes(x=LI))+geom_density(aes(fill=as.factor(Session),group=as.factor(Session)),alpha=0.5)+theme_bw()+ guides(fill=guide_legend(title="Session"))+theme(legend.position='top')+ggtitle(paste0("Model B: meanbias = ",0.2))
+
+p3<-ggplot(mysimB_0.4,aes(x=LI))+geom_density(aes(fill=as.factor(Session),group=as.factor(Session)),alpha=0.5)+theme_bw()+ guides(fill=guide_legend(title="Session"))+theme(legend.position='top')+ggtitle(paste0("Model B: meanbias = ",0.4))
+
+ggpubr::ggarrange(p1,p2,p3,ncol=2,nrow=2,common.legend=TRUE)
+
+```
+
+
+
+
+```{r simscatterplots,warning=FALSE,message=FALSE}
+mysim2 <- data.frame(Session1=mysimA$LI[mysimA$Session=='t1'],Session2=mysimA$LI[mysimA$Session=='t2'],Cols = mysimA$Cat2[mysimA$Session=='t2'])
+
+mysim2$Cols <- car::recode(mysim2$Cols,"22='bilateral on both sessions';11='same lateralised in both sessions';33='same lateralised in both sessions';12='bilateral in one session';21='bilateral in one session';23='bilateral in one session';32='bilateral in one session';13='lateralised in opposite direction in each session';31='lateralised in opposite direction in each session'")
+library(ggpubr)
+mysim2$Cols<-as.factor(mysim2$Cols)
+# Scatter plot colored by groups ("Species")
+sp <- ggscatter(mysim2, x = "Session1", y = "Session2",
+            color = "Cols", palette = "jco",
+            size = 2, alpha = 0.6)+
+border()                                         
+# Marginal density plot of x (top panel) and y (right panel)
+xplot <- ggdensity(mysim2, "Session1", fill = "Cols",
+               palette = "jco")
+yplot <- ggdensity(mysim2, "Session2", fill = "Cols", 
+               palette = "jco")+
+rotate()
+# Cleaning the plots
+sp <- sp + rremove("legend")
+yplot <- yplot + clean_theme() + rremove("legend") 
+xplot <- xplot + clean_theme() + rremove("legend")
+# Arranging the plot using cowplot
+library(cowplot)
+plot_grid(xplot, NULL, sp, yplot, ncol = 2, align = "hv", 
+      rel_widths = c(2, 1), rel_heights = c(1, 2))
+
+```
+
+```{r simscatterplots2,warning=FALSE,message=FALSE}
+mysimB00 <- data.frame(Session1=mysimB_0$LI[mysimB_0$Session=='t1'],Session2=mysimB_0$LI[mysimB_0$Session=='t2'],Cols = mysimA$Cat2[mysimB_0$Session=='t2'])
+mysimB02 <- data.frame(Session1=mysimB_0.2$LI[mysimB_0.2$Session=='t1'],Session2=mysimB_0.2$LI[mysimB_0.2$Session=='t2'],Cols = mysimB_0.2$Cat2[mysimB_0.2$Session=='t2'])
+mysimB04 <- data.frame(Session1=mysimB_0.4$LI[mysimB_0.4$Session=='t1'],Session2=mysimB_0.4$LI[mysimB_0.4$Session=='t2'],Cols = mysimB_0.4$Cat2[mysimB_0.4$Session=='t2'])
+
+
+
+sim_scatter <- function(mysim2=mysimB00)
+{
+
+mysim2$Cols <- car::recode(mysim2$Cols,"22='bilateral on both sessions';11='same lateralised in both sessions';33='same lateralised in both sessions';12='bilateral in one session';21='bilateral in one session';23='bilateral in one session';32='bilateral in one session';13='lateralised in opposite direction in each session';31='lateralised in opposite direction in each session'")
+library(ggpubr)
+mysim2$Cols<-as.factor(mysim2$Cols)
+# Scatter plot colored by groups ("Species")
+sp <- ggscatter(mysim2, x = "Session1", y = "Session2",
+            color = "Cols", palette = "jco",
+            size = 2, alpha = 0.6)+
+border()                                         
+# Marginal density plot of x (top panel) and y (right panel)
+xplot <- ggdensity(mysim2, "Session1", fill = "Cols",
+               palette = "jco")
+yplot <- ggdensity(mysim2, "Session2", fill = "Cols", 
+               palette = "jco")+
+rotate()
+# Cleaning the plots
+sp <- sp + rremove("legend")
+yplot <- yplot + clean_theme() + rremove("legend") 
+xplot <- xplot + clean_theme() + rremove("legend")
+# Arranging the plot using cowplot
+library(cowplot)
+
+
+g1<-plot_grid(xplot, NULL, sp, yplot, ncol = 2, align = "hv", 
+      rel_widths = c(2, 1), rel_heights = c(1, 2))
+return(g1)
+}
+```
+
+```{r scatter_B0,message=FALSE,warning=FALSE,fig.cap='Mean bias = 0'}
+sim_scatter(mysimB00)
+```
+
+```{r scatter_B02,message=FALSE,warning=FALSE,fig.cap='Mean bias = 0.2'}
+sim_scatter(mysimB02)
+```
+
+```{r scatter_B04,message=FALSE,warning=FALSE,fig.cap='Mean bias = 0.4'}
+sim_scatter(mysimB04)
+```
+
+
+This confirms that model B can explain the fact that significant numbers of individuals are categorised as LL or RR (ie 11 or 33), though most are still BB (22)
+And it can explain why we have a positive correlation between the two sessions.
+
+
+
+# Comparison with real data
+Use A2 + Bangor data from Laterality_paper_analyses_Mar2020.rmd
+
+```{r A2dataplus}
+library(janitor)
+myA2<-read.csv('all_LI_lat.csv')
+
+myA2_left<-myA2[myA2$handedness=='L',]
+myA2_right<-myA2[myA2$handedness=='R',]
+#Focus on Jabberwocky as the least lateralised task
+
+tabyl(myA2_left$Jabber12, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+
+
+tabyl(myA2_right$Jabber12, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(1:3) %>% kable(col.names = c("Laterality category","N","Percent")) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+
+
+```
+
+
+
+```{r plots_left}
+myA2_left2<-myA2_left[is.na(myA2_left$Jabber12)==FALSE,]
+myA2_left2$Jabber12<-as.factor(myA2_left2$Jabber12)
+myA2_left2$Jabber12<-recode_factor(myA2_left2$Jabber12, `22` = "bilateral both", `11` = "both lateralised", `33` = "both lateralised", `12`="bilateral in one session", `21`="bilateral in one session", `23`="bilateral in one session", `32`="bilateral in one session", `13`="opposite lateralisations", `31`="opposite lateralisations")
+# Main plot
+pmain <- ggplot(myA2_left2, aes(x = Jabber1, y = Jabber2, color = Jabber12))+
+  geom_point()+ggpubr::color_palette("jco")+annotate('text',2,-2,label=paste0('r = ',round(cor(myA2_left$Jabber1,myA2_left$Jabber2,use='complete.obs'),2)))+theme_bw() + guides(color=guide_legend(title="Laterality class"))+ rremove("legend") 
+# Marginal densities along x axis
+xdens <- axis_canvas(pmain, axis = "x")+
+  geom_density(data = myA2_left2, aes(x = Jabber1, fill = Jabber12),
+              alpha = 0.7, size = 0.2)+
+  ggpubr::fill_palette("jco")
+# Marginal densities along y axis
+# Need to set coord_flip = TRUE, if you plan to use coord_flip()
+ydens <- axis_canvas(pmain, axis = "y", coord_flip = TRUE)+
+  geom_density(data = myA2_left2, aes(x = Jabber2, fill = Jabber12),
+                alpha = 0.7, size = 0.2)+
+  coord_flip()+
+  ggpubr::fill_palette("jco")
+p1 <- insert_xaxis_grob(pmain, xdens, grid::unit(.2, "null"), position = "top")
+p2<- insert_yaxis_grob(p1, ydens, grid::unit(.2, "null"), position = "right")
+g1<-ggdraw(p2)
+
+```
+
+
+```{r plots_right}
+myA2_right2<-myA2_right[is.na(myA2_right$Jabber12)==FALSE,]
+myA2_right2$Jabber12<-as.factor(myA2_right2$Jabber12)
+myA2_right2$Jabber12<-recode_factor(myA2_right2$Jabber12, `22` = "bilateral both", `11` = "both lateralised", `33` = "both lateralised", `12`="bilateral in one session", `21`="bilateral in one session", `23`="bilateral in one session", `32`="bilateral in one session", `13`="opposite lateralisations", `31`="opposite lateralisations")
+# Main plot
+pmain <- ggplot(myA2_right2, aes(x = Jabber1, y = Jabber2, color = Jabber12))+
+  geom_point()+ggpubr::color_palette("jco")+annotate('text',2,-2,label=paste0('r = ',round(cor(myA2_right$Jabber1,myA2_right$Jabber2,use='complete.obs'),2)))+theme_bw() + guides(color=guide_legend(title="Laterality class"))+ rremove("legend") 
+# Marginal densities along x axis
+xdens <- axis_canvas(pmain, axis = "x")+
+  geom_density(data = myA2_right2, aes(x = Jabber1, fill = Jabber12),
+              alpha = 0.7, size = 0.2)+
+  ggpubr::fill_palette("jco")
+# Marginal densities along y axis
+# Need to set coord_flip = TRUE, if you plan to use coord_flip()
+ydens <- axis_canvas(pmain, axis = "y", coord_flip = TRUE)+
+  geom_density(data = myA2_right2, aes(x = Jabber2, fill = Jabber12),
+                alpha = 0.7, size = 0.2)+
+  coord_flip()+
+  ggpubr::fill_palette("jco")
+p1 <- insert_xaxis_grob(pmain, xdens, grid::unit(.2, "null"), position = "top")
+p2<- insert_yaxis_grob(p1, ydens, grid::unit(.2, "null"), position = "right")
+g2<-ggdraw(p2)
+```
+
+
+```{r plot_both}
+ggarrange(g1,g2,ncol=2,nrow=1,labels=c('LEFT','RIGHT'))
+```
