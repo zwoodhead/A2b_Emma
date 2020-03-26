@@ -16,6 +16,8 @@ library(knitr)
 library(kableExtra)
 library(matrixStats)
 library(janitor)
+
+library(propagate)
 ```
 
 ## Rationale
@@ -35,7 +37,7 @@ So
 
 ```{r simLI}
 
-simLI<-function(sim_type='B',npartic=1000,mymean=0,ntrial=15,TRT=0.7)
+simLI<-function(sim_type='B',npartic=1000,mymean=0,ntrial=15,TRT=0.7,SD_t1=0.5,SD_t2=0.8)
 {
   library(matrixStats)
 #npartic=1000 #Large N participants simulated so can see distribution of laterality categories
@@ -57,8 +59,10 @@ if (runif(1)<.5) {mymean <- mymean*-1}
 else{mymean<-0}
   
 # PT: I have had to change the way that DB simulated the data to allow for the test-retest (TRT) correlation between the time points. The data is simulated in short form then change to long format and we can remove one loop and vectorise some calcs.
-
-LItrial <- MASS::mvrnorm(ntrial,c(mymean,mymean),Sigma=matrix(c(1,TRT,TRT,1),2,2,byrow=TRUE)) #ntrial random normal deviates with mean mymean, SD = 1, and corr = TRT (see arguement inputs.
+myCorMat<-matrix(c(1,TRT,TRT,1),2,2,byrow=TRUE)
+mySigma <- propagate::cor2cov(myCorMat,var=c(SD_t1^2,SD_t1^2)) #convert correlation matrix to covariance matrix to allow jabberwocky dist to have different variance from 1 and allow unequal variance (possible, but unlikely).   
+  
+LItrial <- MASS::mvrnorm(ntrial,c(mymean,mymean),Sigma=mySigma) #ntrial random normal deviates with mean mymean, SD = 1, and corr = TRT (see arguement inputs.
 
 mysim[p,c('LI_t1','LI_t2')] <- base::colMeans(LItrial)  #LI for that session is mean of individual trial LIs
 mysim[p,c('SE_t1','SE_t2')] <- matrixStats::colSds(LItrial)/sqrt(ntrial) #standard error for session LIs
@@ -100,13 +104,13 @@ return(mysim)
 }
 
 means=c(0,0.2,0.4)
-mysimA <- simLI(sim_type='A',npartic=1000,mymean=0,ntrial=15,TRT=0.7)
+mysimA <- simLI(sim_type='A',npartic=1000,mymean=0,ntrial=15,TRT=0.85,SD_t1=0.8,SD_t2=0.5)
 
 
 for(i in means)
 {
   nam<-paste0("mysimB_",i)
-assign(nam,simLI(sim_type='B',npartic=1000,mymean=i,ntrial=15,TRT=0.7))
+assign(nam,simLI(sim_type='B',npartic=1000,mymean=i,ntrial=15,TRT=0.85,SD_t1=0.8,SD_t2=0.5))
 }
 
 ```
