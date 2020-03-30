@@ -95,8 +95,9 @@ sims_A<-sims_B<-data.frame(iteration=rep(NA,300),cat11=rep(NA,300),cat12=rep(NA,
 
 for(i in 1:dim(paramA)[1])
 {
-sims_A[i,] <- simLI_tab(sim_type=paramA[i,1],npartic=1000,mymean=paramA[i,2],ntrial=paramA[i,3],TRT=paramA[i,4],SD_t1=paramA[i,5],SD_t2=paramA[i,6])
-sims_B[i,] <- simLI_tab(sim_type=paramB[i,1],npartic=1000,mymean=paramB[i,2],ntrial=paramB[i,3],TRT=paramB[i,4],SD_t1=paramB[i,5],SD_t2=paramB[i,6])
+  print(paste0("iteration ",i))
+sims_A[i,] <- simLI_tab(sim_type=paramA[i,1],npartic=1000,mymean=paramA[i,2],ntrial=paramA[i,3],TRT=paramA[i,4],SD_t1=paramA[i,5],SD_t2=paramA[i,6])$percent
+sims_B[i,] <- simLI_tab(sim_type=paramB[i,1],npartic=1000,mymean=paramB[i,2],ntrial=paramB[i,3],TRT=paramB[i,4],SD_t1=paramB[i,5],SD_t2=paramB[i,6])$percent
 }
 
 mysimfull<-rbind(sims_A,sims_B)
