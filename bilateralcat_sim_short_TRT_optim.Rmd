@@ -99,7 +99,7 @@ sims_A[i,] <- simLI_tab(sim_type=paramA[i,1],npartic=1000,mymean=paramA[i,2],ntr
 sims_B[i,] <- simLI_tab(sim_type=paramB[i,1],npartic=1000,mymean=paramB[i,2],ntrial=paramB[i,3],TRT=paramB[i,4],SD_t1=paramB[i,5],SD_t2=paramB[i,6])
 }
 
-mysimfull<-rbind(mysimA,mysimB)
+mysimfull<-rbind(sims_A,sims_B)
 params<-rbind(paramA,paramB)
 ```
 
