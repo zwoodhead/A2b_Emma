@@ -90,7 +90,9 @@ paramA <- expand.grid(sim_type='A',mymean=0, ntrial=c(15,20,30),TRT=c(0.6,0.7,0.
 paramB <- expand.grid(sim_type='B',mymean=c(0,0.2,0.4), ntrial=c(15,20,30),TRT=c(0.6,0.7,0.8,0.9),SD_t1=c(0.5,0.75,0.8,1,1.5),SD_t2=c(0.5,0.75,0.8,1,1.5))
 
 
-sims_A<-sims_B<-data.frame(iteration=rep(NA,300),cat11=rep(NA,300),cat12=rep(NA,300),cat22=rep(NA,300),cat23=rep(NA,300),cat33=rep(NA,300))
+sims_A<-data.frame(iteration=rep(NA,300),cat11=rep(NA,300),cat12=rep(NA,300),cat22=rep(NA,300),cat23=rep(NA,300),cat33=rep(NA,300),'NA'=rep(NA,300))
+
+sims_B<-data.frame(iteration=rep(NA,900),cat11=rep(NA,900),cat12=rep(NA,900),cat22=rep(NA,900),cat23=rep(NA,900),cat33=rep(NA,900),'NA'=rep(NA,900))
 
 
 for(i in 1:dim(paramA)[1])
@@ -121,20 +123,22 @@ myA2_right<-myA2[myA2$handedness=='R',]
 
 # get true percentages for left and right
 
-trueleft <- tabyl(myA2_left$Jabber12, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(3) 
+trueleft <- janitor::tabyl(myA2_left$Jabber12, sort = TRUE) %>% dplyr::mutate(percent=round(percent*100,2)) %>% dplyr::select(3) 
+trueleft<-trueleft$percent
 
-trueright <- tabyl(myA2_right$Jabber12, sort = TRUE) %>% mutate(percent=round(percent*100,2)) %>% select(3) 
+trueright <- janitor::tabyl(myA2_right$Jabber12, sort = TRUE) %>% dplyr::mutate(percent=round(percent*100,2)) %>% dplyr::select(3) 
+trueright<-trueright$percent
 
 #FIND BEST SCENARIO MATCH TO REAL DATA
 # Extract the differences between the percentages from each sim scenario and the real precentages. THen sum the absolute differences for each scenario and find the minimum for best fit. (similar to least squares-ish, but not regression!) 
 
 #Calc diffs
-diffsleft <- sweep(mysimfull,2,trueleft)
-diffsright <- sweep(mysimfull,2,trueleft)
+diffsleft <- sweep(as.matrix(mysimfull[,2:6]),2,trueleft)
+diffsright <- sweep(as.matrix(mysimfull[,2:6]),2,trueright)
 
 #convert to absolute values in each dataframe 
-abs_diffs_left<-abs(diffsleft)
-abs_diffs_right<-abs(diffsright)
+abs_diffs_left<-abs(as.data.frame(diffsleft))
+abs_diffs_right<-abs(as.data.frame(diffsright))
 
 # now, calc row sums of absolute values to give a value to guage minimum. This minimum indicates the smallest difference between precentages for all categories between simulated and real data. The smallest difference indicates the closest simulation setup to the real data...in theory :-)
 
