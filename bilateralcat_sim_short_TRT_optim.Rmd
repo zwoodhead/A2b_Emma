@@ -90,14 +90,14 @@ paramA <- expand.grid(sim_type='A',mymean=0, ntrial=c(15,20,30),TRT=c(0.6,0.7,0.
 paramB <- expand.grid(sim_type='B',mymean=c(0,0.2,0.4), ntrial=c(15,20,30),TRT=c(0.6,0.7,0.8,0.9),SD_t1=c(0.5,0.75,0.8,1,1.5),SD_t2=c(0.5,0.75,0.8,1,1.5))
 
 
-sims_A<-sims_B<-data.frame(iteration=rep(NA,300),cat11=rep(NA,300),cat12=rep(NA,300),cat22=rep(NA,300),cat23=rep(NA,300),cat33=rep(NA,300),'NA'=rep(NA,300))
+sims_A<-sims_B<-data.frame(iteration=rep(NA,300),cat11=rep(NA,300),cat12=rep(NA,300),cat22=rep(NA,300),cat23=rep(NA,300),cat33=rep(NA,300))
 
 
 for(i in 1:dim(paramA)[1])
 {
   print(paste0("iteration ",i))
-sims_A[i,] <- simLI_tab(sim_type=paramA[i,1],npartic=1000,mymean=paramA[i,2],ntrial=paramA[i,3],TRT=paramA[i,4],SD_t1=paramA[i,5],SD_t2=paramA[i,6])$percent
-sims_B[i,] <- simLI_tab(sim_type=paramB[i,1],npartic=1000,mymean=paramB[i,2],ntrial=paramB[i,3],TRT=paramB[i,4],SD_t1=paramB[i,5],SD_t2=paramB[i,6])$percent
+  sims_A[i,] <- c(i,simLI_tab(sim_type=paramA[i,1],npartic=1000,mymean=paramA[i,2],ntrial=paramA[i,3],TRT=paramA[i,4],SD_t1=paramA[i,5],SD_t2=paramA[i,6])$percent)
+  sims_B[i,] <- c(i,simLI_tab(sim_type=paramB[i,1],npartic=1000,mymean=paramB[i,2],ntrial=paramB[i,3],TRT=paramB[i,4],SD_t1=paramB[i,5],SD_t2=paramB[i,6])$percent)
 }
 
 mysimfull<-rbind(sims_A,sims_B)
