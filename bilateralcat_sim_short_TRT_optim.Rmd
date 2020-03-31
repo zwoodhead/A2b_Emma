@@ -148,8 +148,11 @@ abs_diffs_right<-abs(as.data.frame(diffsright))
 abs_diffs_left$rowsum <- apply(abs_diffs_left,1,sum)
 abs_diffs_right$rowsum <- apply(abs_diffs_right,1,sum)
 
-left.sim.solution <- params[which.min(abs_diffs_left$rowsum),]
-right.sim.solution <- params[which.min(abs_diffs_right$rowsum),]
+left.sim.solution <- params[which(abs_diffs_left$rowsum==min(abs_diffs_left$rowsum)),] #changed to allow multiple unique solutions.
+right.sim.solution <- params[which(abs_diffs_right$rowsum==min(abs_diffs_right$rowsum)),]
+
+left.sim.solution
+right.sim.solution
 
 ```
 
