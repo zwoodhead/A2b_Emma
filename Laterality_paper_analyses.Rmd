@@ -667,7 +667,8 @@ my_pirate = ggplot(data = LI_long,
   labs(y = 'LI Value', x = 'Task') +
   scale_y_continuous(breaks = seq(from = -6, to = 7, by = 1)) +
   theme_bw() +
-  theme(legend.position = 'right', panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
+  theme(legend.position = 'top', legend.box = 'horizontal', 
+        panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
   geom_hline(yintercept = 0) +
   facet_grid(.~Hand) +
   # Asterisks for significant LI values
