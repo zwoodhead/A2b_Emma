@@ -10,23 +10,25 @@
 require(readxl) # xlsx did not work on Macs - you may need to install java first. See java.com 
 require(writexl)
 require(tidyverse)
-require(downloader)
+require(osfr)
+
+
 
 ########################################################
 # Check to see if fTCD data folders exist. 
 # If not, download and unzip raw data directories
-if (file.exists('001') & file.exists('143')) {
-  download("https://osf.io/jt2ca/download", dest="Oxford_data.zip", mode="wb") 
-  download("https://osf.io/zuctb/download", dest="Bangor_data.zip", mode="wb")
-  unzip ("Oxford_data.zip", exdir = "./")
-  unzip ("Bangor_data.zip", exdir = "./")
+if (!file.exists('001') & !file.exists('143')) {
+  osf_retrieve_file('https://osf.io/jt2ca') %>% osf_download() # A2_Oxford_fTCD_Data.zip
+  osf_retrieve_file("https://osf.io/zuctb") %>% osf_download() # A2_Bangor_fTCD_data.zip 
+  unzip ("A2_Oxford_fTCD_Data.zip", exdir = "./")
+  unzip ("A2_Bangor_fTCD_data.zip", exdir = "./")
   }
 
 ########################################################
 # Specify directory and other variable parameters
 dir <- getwd() # Set data directory path here
 rawmeansdir<- "Raw Means"
-dir.create(rawmeansdir)
+if(!file.exists(rawmeansdir)){dir.create(rawmeansdir)}
 
 briefinspect=0; #set to 1 to see a sample of the file to check markers are there
 initialdatacheck=0; #set to 1 toview raw data for each epoch
@@ -68,6 +70,7 @@ ntasks <- length(tasks)
 # Specify subjects
 
 # Read in Triallist to get list of subject IDs
+osf_retrieve_file('https://osf.io/pvb57') %>%  osf_download(conflicts = 'skip')
 trialloc<-"Triallist_Combined.xlsx" # File lists all subjects and trial inclusions/exclusions
 triallist <- read_excel(trialloc, sheet=2)
 
@@ -87,10 +90,11 @@ triallist <- triallist[-excluded_subjects, ]
 # Create matrices for results
 resultsloc1 <- "Results_Combined_Session1.csv" # File name for Results from session 1
 resultsloc2 <- "Results_Combined_Session2.csv" # File name for Results from session 1
-results1 <- read.csv('Results_Session1.csv')
-results1 <- results1 %>% add_row(Filename = included_subjects)
-results2 <- read.csv('Results_Session2.csv')
-results2 <- results2 %>% add_row(Filename = included_subjects)
+osf_retrieve_file('https://osf.io/zuj6x') %>% osf_download(conflicts = 'skip')
+mycolumns<- read.csv('col_names.txt', header=FALSE)
+results2 <- results1 <- matrix(data=NA, nrow=nsubj, ncol=91)
+colnames(results1) <- mycolumns[1:91, ]
+colnames(results2) <- mycolumns[92:182, ]
 
 
 for (mysub in 39:length(included_subjects)){    
