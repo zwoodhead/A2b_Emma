@@ -61,14 +61,16 @@ library(dmm) #added for 'unfactor' command : nb this messes up some dplyr comman
 # devtools::install_github("mikabr/ggpirate")
 library(ggpirate)
 library(heplots)
-require(downloader)
+require(osfr)
 ```
 
 ## Read in list of participants, drop those with incomplete data
 
 ```{r participants}
-particdat_A2    <- read.csv('https://osf.io/5jt6q/download')
-particdat_Bangor<- read.csv('https://osf.io/534jc/download') 
+osf_retrieve_file('https://osf.io/5jt6q') %>% osf_download(conflicts = 'skip') # A2_Participant_Info.csv
+particdat_A2    <- read.csv('A2_Participant_Info.csv')
+osf_retrieve_file('https://osf.io/534jc') %>% osf_download(conflicts = 'skip') # A2_Participant_Info_Bangor.csv
+particdat_Bangor    <- read.csv('A2_Participant_Info_Bangor.csv')
 
 incomplete <- which(particdat_Bangor$Complete == 0)
 nincomplete <- length(incomplete)
@@ -121,9 +123,10 @@ If a participant has missing data for more than one task, that participant will 
 
 ```{r readdata, warning=FALSE}
 #Check to see if Results files (from A2_Combined_doppler_analysis.R) are present in directory. If not, download from OSF
-
-data1 <- read.csv('https://osf.io/ntjea/download')
-data2 <- read.csv('https://osf.io/nstq9/download')
+osf_retrieve_file('https://osf.io/ntjea') %>% osf_download(conflicts = 'skip') # Results_Combined_Session1.csv
+data1    <- read.csv('Results_Combined_Session1.csv')
+osf_retrieve_file('https://osf.io/nstq9') %>% osf_download(conflicts = 'skip') # Results_Combined_Session2.csv
+data2    <- read.csv('Results_Combined_Session2.csv')
 
 # Only take the participants included in particdat (allows you to drop subjects by handedness, and omits incomplete subjects)
 data1 <- data1[which(data1$Filename %in% particdat$ID), ] 
@@ -369,8 +372,11 @@ Behavioural task data includes responses the participants made during the task, 
 The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
 
 ```{r behaviouraldata}
-behavdat_A2     <- read.csv('https://osf.io/wznbv/download') # Downloads A2_Behavioural_Data.csv from OSF Project
-behavdat_Bangor <- read.csv('https://osf.io/mzgan/download') # Downloads A2_Behavioural_Data_Bangor.csv from OSF
+osf_retrieve_file('https://osf.io/wznbv') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data.csv
+behavdat_A2    <- read.csv('A2_Behavioural_Data.csv')
+osf_retrieve_file('https://osf.io/mzgan') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data_Bangor.csv
+behavdat_Bangor    <- read.csv('A2_Behavioural_Data_Bangor.csv')
+
 colnames(behavdat_A2)[1] <- 'ID'
 behavdat <- rbind(behavdat_A2,behavdat_Bangor)
 
@@ -499,8 +505,8 @@ The following chunk reports summary statistics and produces a plot of the LI val
 
 ```{r LI_means, warning=FALSE}
 # Check / download script for ggpirate plot
-if(!file.exists('geom_pirate_ZW.R')){download('https://osf.io/hyjxq/download', dest = 'geom_pirate_ZW.R')}
-source('geom_pirate_ZW.R')
+osf_retrieve_file('https://osf.io/26w9g/') %>% osf_download(conflicts = 'skip') # Downloads geom_pirate_ZW.R
+source('geom_pirate_ZW_local.R')
 
 # Create data frame for Shapiro Wilks test results
 handedness <- c('Right Handed', 'Left Handed')
