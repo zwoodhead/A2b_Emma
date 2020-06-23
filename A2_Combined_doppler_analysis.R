@@ -15,14 +15,13 @@ require(osfr)
 
 
 ########################################################
-# Check to see if fTCD data folders exist. 
-# If not, download and unzip raw data directories
-if (!file.exists('001') & !file.exists('143')) {
-  osf_retrieve_file('https://osf.io/jt2ca') %>% osf_download() # A2_Oxford_fTCD_Data.zip
-  osf_retrieve_file("https://osf.io/zuctb") %>% osf_download() # A2_Bangor_fTCD_data.zip 
-  unzip ("A2_Oxford_fTCD_Data.zip", exdir = "./")
-  unzip ("A2_Bangor_fTCD_data.zip", exdir = "./")
-  }
+# Download and unzip the data zip files. 
+# NB: it will not overwrite existing files
+
+osf_retrieve_file('https://osf.io/jt2ca') %>% osf_download(conflicts = 'skip') # A2_Oxford_fTCD_Data.zip
+osf_retrieve_file("https://osf.io/zuctb") %>% osf_download(conflicts = 'skip') # A2_Bangor_fTCD_data.zip 
+unzip ("A2_Oxford_fTCD_Data.zip", exdir = ".", overwrite = FALSE)
+unzip ("A2_Bangor_fTCD_data.zip", exdir = ".", overwrite = FALSE)
 
 ########################################################
 # Specify directory and other variable parameters
