@@ -29,75 +29,70 @@ remove.Ntrial     <- 1 # Set to 1 to run exclusion of those with < 12 good trial
 ########################################################################################################
 
 #Needs OpenMx, which you get with following command (not CRAN)
-#source('https://openmx.ssri.psu.edu/software/getOpenMx.R')
-require(tidyverse)
-require(OpenMx)
-require(umx)
-require(semTools) #for fit measures
-#library(DiagrammeR) #for the diagram
-require(stringr)
-require(data.table)
-library('devtools')
-library("reshape2")
-library("yarrr")
-#library(DiagrammeRsvg)
+#source("https://openmx.ssri.psu.edu/software/getOpenMx.R")
+library(tidyverse)
+library(OpenMx)
+library(umx)
+library(semTools) #for fit measures
+library(data.table)
+library(devtools)
+library(reshape2)
 library(magrittr)
 library(svglite)
 library(rsvg)
 library(knitr)
-library(dmm) #added for 'unfactor' command : nb this messes up some dplyr commands, need to specify dplyr explicitly, e.g. dplyr::select for 'select' command.
 # On first use, please also install ggpirate as follows:
 # devtools::install_github("mikabr/ggpirate")
 library(ggpirate)
 library(heplots)
-require(osfr)
+library(osfr)
 ```
 
 ## Read in list of participants, drop those with incomplete data
 
 ```{r participants}
-osf_retrieve_file('https://osf.io/5jt6q') %>% osf_download(conflicts = 'skip') # A2_Participant_Info.csv
-particdat_A2    <- read.csv('A2_Participant_Info.csv')
-osf_retrieve_file('https://osf.io/534jc') %>% osf_download(conflicts = 'skip') # A2_Participant_Info_Bangor.csv
-particdat_Bangor    <- read.csv('A2_Participant_Info_Bangor.csv')
+osf_retrieve_file("https://osf.io/5jt6q") %>% osf_download(conflicts = "skip") # A2_Participant_Info.csv
+particdat_A2    <- read.csv("A2_Participant_Info.csv")
+osf_retrieve_file("https://osf.io/534jc") %>% osf_download(conflicts = "skip") # A2_Participant_Info_Bangor.csv
+particdat_Bangor    <- read.csv("A2_Participant_Info_Bangor.csv")
 
 incomplete <- which(particdat_Bangor$Complete == 0)
 nincomplete <- length(incomplete)
-cat(paste(nincomplete, ' incomplete datasets excluded from analysis'))
+cat(paste(nincomplete, " incomplete datasets excluded from analysis"))
 particdat_Bangor <- particdat_Bangor[-incomplete, ]
 
 new_subjects <- length(particdat_Bangor$ID)
 new_group_info <- particdat_Bangor %>% group_by(handedness) %>% summarise(n=n())
-cat(paste('\nCompete datasets from Bangor by group: '))
+cat(paste("\nCompete datasets from Bangor by group: "))
 new_group_info
 
 # Merge both datasets
 particdat <- rbind(particdat_A2[,c(1:4)], particdat_Bangor[,c(1:4)])
-rhanded <- which(particdat$handedness == 'R')
+rhanded <- which(particdat$handedness == "R")
 
-# Create variable 'handcode', needed when numeric value used for colour in plots
+# Create variable "handcode", needed when numeric value used for colour in plots
 particdat$handcode <- 2
 particdat$handcode[rhanded] <- 1
 
-# Create variable 'study', according to whether the data was acquired in A2 study or in Bangor
-particdat$study <- c(rep('A2', length(particdat_A2$ID)), rep('Bangor', length(particdat_Bangor$ID)))
+# Create variable "study", according to whether the data was acquired in A2 study or in Bangor
+particdat$study <- c(rep("A2", length(particdat_A2$ID)), rep("Bangor", length(particdat_Bangor$ID)))
 
 # Init30only: original sample from prereg analysis
 if (Init30only==1) {
-  cat('First 30 subjects only included in analysis')
+  cat("First 30 subjects only included in analysis")
   particdat<-particdat[1:30,]
 }
 
 # Fonly: only female participants
 if (Fonly== 1){
-  cat('Females only included in analysis')
-  particdat <- filter(particdat,Gender=='F')
+  cat("Females only included in analysis")
+  particdat <- filter(particdat,Gender=="F")
 }
 
 # Full datasets before excluding data:
 n_full_subj <- length(particdat$ID)
 full_group_info <- particdat %>% group_by(handedness) %>% summarise(n=n())
-cat(paste('\nCompete datasets from both sites combined: '))
+cat(paste("\nCompete datasets from both sites combined: "))
 full_group_info
 
 full_gender_info <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n())
@@ -107,15 +102,15 @@ full_gender_info
 ## Read in LI data, drop those with insufficient number of good trials
 
 During the fTCD data collection, noise may occur due to movement or interference affecting the ultrasound probes. Trials with excessive noise have been manually identified and excluded from analysis. Trials may also have been excluded if the participant failed to perform the task correctly.
-There are 15 trials per task (in each session). If a participant has less than 10 'good' (included) trials for a particular task, their data for that task will be excluded from the analysis.
+There are 15 trials per task (in each session). If a participant has less than 10 "good" (included) trials for a particular task, their data for that task will be excluded from the analysis.
 If a participant has missing data for more than one task, that participant will be excluded from the analysis entirely.
 
 ```{r readdata, warning=FALSE}
 #Check to see if Results files (from A2_Combined_doppler_analysis.R) are present in directory. If not, download from OSF
-osf_retrieve_file('https://osf.io/ntjea') %>% osf_download(conflicts = 'skip') # Results_Combined_Session1.csv
-data1    <- read.csv('Results_Combined_Session1.csv')
-osf_retrieve_file('https://osf.io/nstq9') %>% osf_download(conflicts = 'skip') # Results_Combined_Session2.csv
-data2    <- read.csv('Results_Combined_Session2.csv')
+osf_retrieve_file("https://osf.io/ntjea") %>% osf_download(conflicts = "skip") # Results_Combined_Session1.csv
+data1    <- read.csv("Results_Combined_Session1.csv")
+osf_retrieve_file("https://osf.io/nstq9") %>% osf_download(conflicts = "skip") # Results_Combined_Session2.csv
+data2    <- read.csv("Results_Combined_Session2.csv")
 
 # Only take the participants included in particdat (allows you to drop subjects by handedness, and omits incomplete subjects)
 data1 <- data1[which(data1$Filename %in% particdat$ID), ] 
@@ -137,11 +132,11 @@ for (v in 1:ncol(alltask)){
   alltask[,v]<-as.numeric(alltask[,v])
 }
 
-mylabels<-c('ListGen1','PhonDec1','SemDec1','SentGen1','SentComp1','Jabber1',
-            'ListGen2','PhonDec2','SemDec2','SentGen2','SentComp2','Jabber2')
-myshortlab<-c('ListGen','PhonDec','SemDec','SentGen','SentComp','Jabber')
-mylonglab <-c('List Generation','Phonological Decision','Semantic Decision',
-              'Sentence Generation','Sentence Comprehension','Syntactic Decision')
+mylabels<-c("ListGen1","PhonDec1","SemDec1","SentGen1","SentComp1","Jabber1",
+            "ListGen2","PhonDec2","SemDec2","SentGen2","SentComp2","Jabber2")
+myshortlab<-c("ListGen","PhonDec","SemDec","SentGen","SentComp","Jabber")
+mylonglab <-c("List Generation","Phonological Decision","Semantic Decision",
+              "Sentence Generation","Sentence Comprehension","Syntactic Decision")
 
 colnames(alltask)<-mylabels
 
@@ -151,7 +146,7 @@ alltaskall <- alltask
 # Identify datapoints with less than 10 useable trials to be excluded
 dropN<-0 #initialise counter
 
-nbit<-c('A1.N','B1.N','C1.N','D1.N','E1.N','F1.N')
+nbit<-c("A1.N","B1.N","C1.N","D1.N","E1.N","F1.N")
 for (i in 1:6){
   w<-which(colnames(data1) == nbit[i])
   ww<-which(as.numeric(data1[ ,w]) < 10)
@@ -161,7 +156,7 @@ for (i in 1:6){
   }
 }
 
-nbit<-c('A2.N','B2.N','C2.N','D2.N','E2.N','F2.N')
+nbit<-c("A2.N","B2.N","C2.N","D2.N","E2.N","F2.N")
 for (i in 1:6){
   w <- which(colnames(data2) == nbit[i])
   ww <- which(as.numeric(data2[ ,w]) < 10)
@@ -171,11 +166,11 @@ for (i in 1:6){
     dropN
   }
 }
-cat(paste('Dropped datapoints because < 10 trials, N = ',dropN))
+cat(paste("Dropped datapoints because < 10 trials, N = ",dropN))
 
 subj_inclusion <- data.frame(
-  'ID' = data1$Filename,
-  'include' = rep(1, length(data1$Filename))
+  "ID" = data1$Filename,
+  "include" = rep(1, length(data1$Filename))
 )
 
 for (i in 1:length(data1$Filename)){
@@ -185,8 +180,8 @@ for (i in 1:length(data1$Filename)){
 
 drop_subj <- subj_inclusion$ID[which(subj_inclusion$include == 0)]
 
-cat(paste('\nDropped subjects because > 2 missing or dropped datapoints, N = ', length(drop_subj)))
-cat(paste('\nDropped subject(s): ', drop_subj))
+cat(paste("\nDropped subjects because > 2 missing or dropped datapoints, N = ", length(drop_subj)))
+cat(paste("\nDropped subject(s): ", drop_subj))
 
 # Remove these subjects from particdat, data1, data2, alltask and alltaskall
 particdat <- particdat[-which(particdat$ID %in% drop_subj), ] 
@@ -229,12 +224,12 @@ for (i in 1:12){
   }
 }
 
-cat(paste('Dropped datapoints because high SE, N = ',dropSE))
+cat(paste("Dropped datapoints because high SE, N = ",dropSE))
 
 # Drop participants if two or more datapoints are dropped as outliers
 subj_inclusion_outliers <- data.frame(
-  'ID' = data1$Filename,
-  'include' = rep(1, length(data1$Filename))
+  "ID" = data1$Filename,
+  "include" = rep(1, length(data1$Filename))
 )
 
 for (i in 1:length(data1$Filename)){
@@ -244,8 +239,8 @@ for (i in 1:length(data1$Filename)){
 
 drop_subj_outliers <- subj_inclusion_outliers$ID[which(subj_inclusion_outliers$include == 0)]
 
-cat(paste('\nDropped subjects because > 2 outlier datapoints, N = ', length(drop_subj_outliers)))
-cat(paste('\n', drop_subj_outliers))
+cat(paste("\nDropped subjects because > 2 outlier datapoints, N = ", length(drop_subj_outliers)))
+cat(paste("\n", drop_subj_outliers))
 
 if (length(drop_subj_outliers) > 0){
   # Remove these subjects from particdat, data1, data2, alltask and alltaskall
@@ -258,7 +253,7 @@ if (length(drop_subj_outliers) > 0){
 
 # Count final number of subjects
 nsubj_final <- dim(data1)[1]
-cat(paste('\nFinal number of subjects: ', nsubj_final))
+cat(paste("\nFinal number of subjects: ", nsubj_final))
 ```
 
 Calculate laterality categories
@@ -341,8 +336,8 @@ n_info
 
 gender_by_handedness <- particdat %>% group_by(handedness, Gender) %>% summarise(n=n()) 
 gender_table <- cbind(gender_by_handedness$n[1:2], gender_by_handedness$n[3:4])
-colnames(gender_table) <- c('Left','Right')
-rownames(gender_table) <- c('Female','Male')
+colnames(gender_table) <- c("Left","Right")
+rownames(gender_table) <- c("Female","Male")
 chisq.test(gender_table)
 
 
@@ -358,16 +353,16 @@ t.test(particdat$Age_m[which(particdat$handcode==1)], particdat$Age_m[which(part
 
 Behavioural task data includes responses the participants made during the task, i.e. reaction times and accuracy for decision tasks, or the number of words produced for speech generation tasks.
 
-The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
+The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren"t.)
 
 ```{r behaviouraldata}
-osf_retrieve_file('https://osf.io/wznbv') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data.csv
-behavdat_A2    <- read.csv('A2_Behavioural_Data.csv')
-osf_retrieve_file('https://osf.io/mzgan') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data_Bangor.csv
-behavdat_Bangor    <- read.csv('A2_Behavioural_Data_Bangor.csv')
+osf_retrieve_file("https://osf.io/wznbv") %>% osf_download(conflicts = "skip") # A2_Behavioural_Data.csv
+behavdat_A2    <- read.csv("A2_Behavioural_Data.csv")
+osf_retrieve_file("https://osf.io/mzgan") %>% osf_download(conflicts = "skip") # A2_Behavioural_Data_Bangor.csv
+behavdat_Bangor    <- read.csv("A2_Behavioural_Data_Bangor.csv")
 
-colnames(behavdat_A2)[1] <- 'ID'
-colnames(behavdat_Bangor)[1] <- 'ID'
+colnames(behavdat_A2)[1] <- "ID"
+colnames(behavdat_Bangor)[1] <- "ID"
 behavdat <- rbind(behavdat_A2,behavdat_Bangor)
 
 # Only include participants in particdat
@@ -387,7 +382,7 @@ behavdat <- behavdat %>% dplyr::select(handedness, A1.Words, A2.Words, A1.Omit, 
                    F1.Acc, F2.Acc, F1.RT, F2.RT, F1.Omit, F2.Omit)
 
 # Recalculate the number of omitted trials as a percentage
-omit.cols<- grep('*.Omit',colnames(behavdat))
+omit.cols<- grep("*.Omit",colnames(behavdat))
 nevents <- c(15, 15, 90, 90, # task A1, A2, B1, B2
              90, 90, 15, 15, # tasks C1, C2, D1, D2
              90, 90, 45, 45) # tasks E1, E2, F1, F2
@@ -397,34 +392,34 @@ behavdat[ , omit.cols[i]] <- round(tmp, 2)
 }
 
 # # Recalculate the RT data in ms rather than seconds
-# rt.cols<-grep('*.RT', colnames(behavdat))
+# rt.cols<-grep("*.RT", colnames(behavdat))
 # behavdat[ , rt.cols] <- behavdat[ , rt.cols] * 1000
 
-behav_means_LH <- round(colMeans(behavdat[which(behavdat$handedness=='L'),-1], na.rm = TRUE), 2)
-behav_means_RH <- round(colMeans(behavdat[which(behavdat$handedness=='R'),-1], na.rm = TRUE), 2)
+behav_means_LH <- round(colMeans(behavdat[which(behavdat$handedness=="L"),-1], na.rm = TRUE), 2)
+behav_means_RH <- round(colMeans(behavdat[which(behavdat$handedness=="R"),-1], na.rm = TRUE), 2)
 
-behav_sd_LH <- apply(behavdat[which(behavdat$handedness=='L') , -1], 2, function(x){
+behav_sd_LH <- apply(behavdat[which(behavdat$handedness=="L") , -1], 2, function(x){
   round(sd(x, na.rm = TRUE), 2)
 })
-behav_sd_RH <- apply(behavdat[which(behavdat$handedness=='R') , -1], 2, function(x){
+behav_sd_RH <- apply(behavdat[which(behavdat$handedness=="R") , -1], 2, function(x){
   round(sd(x, na.rm = TRUE), 2)
 })
 
 behav_table <- cbind(behav_means_LH, behav_sd_LH, behav_means_RH, behav_sd_RH)
-colnames(behav_table) <- c('LH mean', 'LH sd', 'RH mean', 'RH sd')
+colnames(behav_table) <- c("LH mean", "LH sd", "RH mean", "RH sd")
 kable(behav_table)
 
-word.cols <- grep('*.Words', colnames(behavdat))
-acc.cols<-grep('*.Acc', colnames(behavdat))
-rt.cols<-grep('*.RT', colnames(behavdat))
+word.cols <- grep("*.Words", colnames(behavdat))
+acc.cols<-grep("*.Acc", colnames(behavdat))
+rt.cols<-grep("*.RT", colnames(behavdat))
 
 # Do left and right handers show different levels of task performance?
 cols_to_test <- c(word.cols, acc.cols, rt.cols)
 behav_tests <- data.frame(
-  'Measure' = colnames(behavdat)[cols_to_test],
-  'df' = rep(NA, length(cols_to_test)),
-  't' = rep(NA, length(cols_to_test)),
-  'p' = rep(NA, length(cols_to_test))
+  "Measure" = colnames(behavdat)[cols_to_test],
+  "df" = rep(NA, length(cols_to_test)),
+  "t" = rep(NA, length(cols_to_test)),
+  "p" = rep(NA, length(cols_to_test))
 )
 
 for (i in 1:length(cols_to_test)){
@@ -436,15 +431,15 @@ for (i in 1:length(cols_to_test)){
   behav_tests$p[i] <- my_test$p.value
 }
 corrected_alpha <- .05 / length(cols_to_test)
-cat(paste0('Alpha corrected for ', length(cols_to_test), ' multiple comparisons = ', corrected_alpha))
+cat(paste0("Alpha corrected for ", length(cols_to_test), " multiple comparisons = ", corrected_alpha))
 
 if (length(which(behav_tests$p < corrected_alpha)) > 0){
-  cat(paste0('Significant difference between left and right handers observed for: '))
+  cat(paste0("Significant difference between left and right handers observed for: "))
   print(behav_tests$Measure[which(behav_tests$p < corrected_alpha)])
 }
 if (length(which(behav_tests$p < corrected_alpha)) == 0){
-  cat(paste0('\nNo significant difference between left and right handers observed for number of words, RT or Accuracy on any task'))
-  cat(paste0('p > ', round(min(behav_tests$p), 4), ' in all cases.'))
+  cat(paste0("\nNo significant difference between left and right handers observed for number of words, RT or Accuracy on any task"))
+  cat(paste0("p > ", round(min(behav_tests$p), 4), " in all cases."))
 }
 
 kable(behav_tests)
@@ -461,7 +456,7 @@ cols_to_test <- cols_to_test[seq(from = 1, to = length(cols_to_test)-1, by = 2)]
 behav_measures <- length(cols_to_test)  # Number of tests performed
 
 behav_retest <- data.frame(matrix(NA,nrow=behav_measures,ncol=3))
-colnames(behav_retest)<-c('Measure','V','p')
+colnames(behav_retest)<-c("Measure","V","p")
 behav_retest$Measure <- colnames(behavdat)[cols_to_test]
 
 myrow <- 0
@@ -482,8 +477,8 @@ for (m in 1:behav_measures){
 # Report results
 corrected_alpha <- .05 / behav_measures
 sig_count <- length(which(behav_retest$p < corrected_alpha))
-cat(paste('Number of tasks with significant test-retest behavioural differences: ', sig_count))
-if (sig_count > 0){cat('\nCheck behav_retest for details')}
+cat(paste("Number of tasks with significant test-retest behavioural differences: ", sig_count))
+if (sig_count > 0){cat("\nCheck behav_retest for details")}
 
 ```
 
@@ -495,25 +490,25 @@ The following chunk reports summary statistics and produces a plot of the LI val
 
 ```{r LI_means, warning=FALSE}
 # Check / download script for ggpirate plot
-osf_retrieve_file('https://osf.io/26w9g/') %>% osf_download(conflicts = 'overwite') # Downloads geom_pirate_ZW.R
-source('geom_pirate_ZW_local.R')
+osf_retrieve_file("https://osf.io/26w9g/") %>% osf_download(conflicts = "overwite") # Downloads geom_pirate_ZW.R
+source("geom_pirate_ZW_local.R")
 
 # Create data frame for Shapiro Wilks test results
-handedness <- c('Right Handed', 'Left Handed')
+handedness <- c("Right Handed", "Left Handed")
 shapdf <- data.frame(matrix(NA, nrow=24, ncol=4))
-colnames(shapdf) <- c('Task', 'Session', 'Hand', 'p')
+colnames(shapdf) <- c("Task", "Session", "Hand", "p")
 myrow<-0 
 
 # Normality tests and plots
 for (i in 1:6){ # Loop through tasks
-  my_fig_name <- paste0('Supp_Fig_1', LETTERS[i], '.png')
+  my_fig_name <- paste0("Supp_Fig_1", LETTERS[i], ".png")
   png(my_fig_name, width=8, height=6, units="in", res=300)
   par(mfrow=c(2,4))
   
   for (j in 1:2){ # Loop through sessions
   offset<- 6*(j-1)
   
-    for (h in c(2,1)){ # Loop through handedness (left first so it's on the left of the plot)
+    for (h in c(2,1)){ # Loop through handedness (left first so it"s on the left of the plot)
       myrow<-myrow+1
       handedness_text <- handedness[h]
       handedness_rows <- which(particdat$handcode == h)
@@ -523,15 +518,15 @@ for (i in 1:6){ # Loop through tasks
       # Histogram
       
       plot (density (tempdata, na.rm = TRUE),
-            main = paste (handedness_text, '_', mylabels[(i + offset)]),
+            main = paste (handedness_text, "_", mylabels[(i + offset)]),
             xlim = c(-6, 8), ylim = c(0, 0.4))
       
       
-      text(-2, 0.3, paste('mean = \n', round(mean(tempdata, na.rm = TRUE), 2)))
+      text(-2, 0.3, paste("mean = \n", round(mean(tempdata, na.rm = TRUE), 2)))
       
       # qqplot
       qqnorm(tempdata); qqline(tempdata, col = 2)
-      text(1, 0, paste('Shapiro\np = ', round(myshap$p.value, 3)))
+      text(1, 0, paste("Shapiro\np = ", round(myshap$p.value, 3)))
       shapdf$Task[myrow] <- LETTERS[i] # Clever! Swaps numbers 1:6 to letters A:F
       shapdf$Session[myrow] <- j
       shapdf$Hand[myrow] <- h
@@ -545,7 +540,7 @@ for (i in 1:6){ # Loop through tasks
   
 # One-sample t-tests to compare LI to zero
 LI_ttests<-data.frame(matrix(NA,nrow=24,ncol=10))
-colnames(LI_ttests)<-c('Taskcode','Session','Hand','mean','sd','t','df','p','LI','lab')
+colnames(LI_ttests)<-c("Taskcode","Session","Hand","mean","sd","t","df","p","LI","lab")
 
 LI_ttests$Session <- rep(c(1,2),6)
 LI_ttests$Task <- rep(myshortlab,each=2)
@@ -563,7 +558,7 @@ for (h in c(1,2)){ # Loop through handedness
       mycol <- t + ((s-1)*6) 
       
       # Perform t-test
-      my_test <- t.test(alltask[handedness_rows, mycol], alternative='greater')
+      my_test <- t.test(alltask[handedness_rows, mycol], alternative="greater")
       
       # Organise output
       LI_ttests$Taskcode[myrow] <- LETTERS[t]
@@ -575,7 +570,7 @@ for (h in c(1,2)){ # Loop through handedness
       LI_ttests$df[myrow] <-my_test$parameter
       LI_ttests$p[myrow] <-round(my_test$p.value,3)
       LI_ttests$LI[myrow] <- max(alltask[handedness_rows, mycol],na.rm=TRUE)+1
-      mylabel <- ''
+      mylabel <- ""
       if(my_test$p.value<.05){mylabel <- "*"}
       if(my_test$p.value<.01){mylabel <- "**"}
       if(my_test$p.value<.001){mylabel <- "***"}
@@ -593,23 +588,23 @@ ID_data <- data.frame(
   ID = as.factor(particdat$ID),
   Hand = as.factor(particdat$handedness))
 pirate_data <- cbind(ID_data, alltaskall)
-#colnames(pirate_data)[15:26] <- c('A1_cat', 'B1_cat', 'C1_cat', 'D1_cat', 'E1_cat', 'F1_cat',
-#                                  'A2_cat', 'B2_cat', 'C2_cat', 'D2_cat', 'E2_cat', 'F2_cat')
+#colnames(pirate_data)[15:26] <- c("A1_cat", "B1_cat", "C1_cat", "D1_cat", "E1_cat", "F1_cat",
+#                                  "A2_cat", "B2_cat", "C2_cat", "D2_cat", "E2_cat", "F2_cat")
 
-LI_long <- melt(pirate_data, value.name = 'LI') #version with outliers 
+LI_long <- melt(pirate_data, value.name = "LI") #version with outliers 
 LI_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
 LI_long$Task <- rep(rep(myshortlab, each=nsubj_final), 2)
-LI_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = nsubj_final), 2)
-levels(LI_long$Hand) <- c('Left Handed','Right Handed')
+LI_long$Taskcode <- rep(rep(c("A","B","C","D","E","F"), each = nsubj_final), 2)
+levels(LI_long$Hand) <- c("Left Handed","Right Handed")
 
 # Add laterality categories
 category_data <- cbind(ID_data, alltasklat)
 category_long <- melt(category_data)
-colnames(category_long) <- c('ID','Hand','Task','Category')
+colnames(category_long) <- c("ID","Hand","Task","Category")
 category_long$Category[which(category_long$Category != 2)] <- 1
 category_long$Category[which(category_long$Category == 2)] <- 0
 category_long$Hand <- LI_long$Hand
-category_long$Task <- rep(rep(c('A','B','C','D','E','F'), each = nsubj_final), 2)
+category_long$Task <- rep(rep(c("A","B","C","D","E","F"), each = nsubj_final), 2)
 category_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
 category_long$LI <- LI_long$LI
 category_long$Category <- as.factor(category_long$Category)
@@ -618,20 +613,20 @@ levels(category_long$Category) <- c(1, 16)
 
 # Also identify excluded data points (NAs in alltask)
 NA_data <- cbind(ID_data, alltask)
-NA_long <- melt(NA_data, value.name = 'LI_NA')
+NA_long <- melt(NA_data, value.name = "LI_NA")
 NA_long[ , 5:8] <- LI_long[ , 4:7]
-levels(NA_long$Hand) <- c('Left Handed','Right Handed')
+levels(NA_long$Hand) <- c("Left Handed","Right Handed")
 
 #add dummy rows to make the plot jitter work
 extra_data <- data.frame(matrix(20, nrow=2, ncol=14))
-colnames(extra_data) <- c('ID','Hand',colnames(alltask))  
-extra_data$ID <- as.factor('dummy')
-extra_data$Hand <- as.factor(c('L','R'))
-extra_long <- melt(extra_data, value.name = 'LI_NA')
+colnames(extra_data) <- c("ID","Hand",colnames(alltask))  
+extra_data$ID <- as.factor("dummy")
+extra_data$Hand <- as.factor(c("L","R"))
+extra_long <- melt(extra_data, value.name = "LI_NA")
 extra_long$Session <- as.factor(c(rep(1, 2*6), rep(2, 2*6)))
 extra_long$Task <- rep(rep(myshortlab, each=2), 2)
-extra_long$Taskcode <- rep(rep(c('A','B','C','D','E','F'), each = 2), 2)
-levels(extra_long$Hand) <- c('Left Handed','Right Handed')
+extra_long$Taskcode <- rep(rep(c("A","B","C","D","E","F"), each = 2), 2)
+levels(extra_long$Hand) <- c("Left Handed","Right Handed")
 extra_long$LI_NA <- NA
 extra_long$LI <- NA
 
@@ -646,33 +641,33 @@ my_pirate = ggplot(data = LI_long,
                                  colour = Session)) +
  geom_pirate_ZW(points_params = list(alpha = 0),
                  bars = FALSE,
-                 #bars_params = list(colour = 'black'),
+                 #bars_params = list(colour = "black"),
                  #violins_params = list(width = 3),
                  #cis_params = list(width = 3),
                  #lines_params = list(width = 3),
                  jitter_width = 0.4, show.legend=TRUE) +
-  labs(y = 'LI Value', x = 'Task') +
+  labs(y = "LI Value", x = "Task") +
   scale_y_continuous(breaks = seq(from = -6, to = 7, by = 1)) +
   theme_bw() +
-  theme(legend.position = 'right', panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
+  theme(legend.position = "right", panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
   geom_hline(yintercept = 0) +
   facet_grid(.~Hand) +
   # Asterisks for significant LI values
   geom_text(data = LI_ttests, aes(x = Taskcode, group = Session, y = LI, label = lab),
-            position = position_dodge(0.7), colour = 'black') +
+            position = position_dodge(0.7), colour = "black") +
   # Coded points for laterality categories
   geom_point(data = category_long, aes(x = Task, group = Session, y = LI, shape = Category),
              position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.7),
              size = 1.2, alpha = 0.8, na.rm = TRUE) +
   scale_shape_manual(values = c(1, 19), 
-                     name = 'Lateralisation', labels = c('Non-lateralised', 'Lateralised')) +
+                     name = "Lateralisation", labels = c("Non-lateralised", "Lateralised")) +
   # Black points for outlier datapoints
   geom_point(data = NA_long, aes(x = Taskcode, group = Session, y = LI),
-             position = position_dodge(0.7), colour = 'black', size = 1.4, pch=18)
+             position = position_dodge(0.7), colour = "black", size = 1.4, pch=18)
 
 print(my_pirate)
 
-ggsave(filename = 'Figure2.png', plot = my_pirate, width = 8, height = 4)
+ggsave(filename = "Figure2.png", plot = my_pirate, width = 8, height = 4)
 
 # Holy moly that was a lot of work for one plot
 ```
@@ -685,7 +680,7 @@ This chunk checks whether there are any test-retest differences in LI values
 ```{r LI-retest}
 # Test-retest comparisons of LI values
 LI_retest <- data.frame(matrix(NA,nrow=12,ncol=5))
-colnames(LI_retest)<-c('Hand','Task','t','df','p')
+colnames(LI_retest)<-c("Hand","Task","t","df","p")
 LI_retest$Hand <- rep(c(1,2),each=6)
 LI_retest$Task <- rep(myshortlab,2)
 
@@ -708,8 +703,8 @@ for (h in 1:2) {
 }
 
 sig_count <- length(which(LI_retest$p < .05))
-cat(paste('Number of tasks with significant test-retest LI differences: ', sig_count))
-if (sig_count > 0){cat('\nCheck LI_retest for details')}
+cat(paste("Number of tasks with significant test-retest LI differences: ", sig_count))
+if (sig_count > 0){cat("\nCheck LI_retest for details")}
 
 ```
 
@@ -721,15 +716,15 @@ if (sig_count > 0){cat('\nCheck LI_retest for details')}
 
 ilist <- c(1,7,2,8,3,9,4,10,5,11,6,12)
 both_cormats <- data.frame(matrix(data=NA, nrow=1, ncol=4))
-colnames(both_cormats) <- c('Var1','Var2','cor','Hand')
+colnames(both_cormats) <- c("Var1","Var2","cor","Hand")
 
 for(h in 1:2){ # Loop through right and left handers
   handedness_rows <- which(particdat$handcode == h)
   
   # Select alltask data and perform correlations
   cormat<-round(cor(alltask[handedness_rows, ilist], use="pairwise.complete.obs", method="pearson"),2)
-  rownames(cormat)<-c('A1','A2','B1','B2','C1','C2','D1','D2','E1','E2','F1','F2')
-  colnames(cormat)<-c('A1','A2','B1','B2','C1','C2','D1','D2','E1','E2','F1','F2')
+  rownames(cormat)<-c("A1","A2","B1","B2","C1","C2","D1","D2","E1","E2","F1","F2")
+  colnames(cormat)<-c("A1","A2","B1","B2","C1","C2","D1","D2","E1","E2","F1","F2")
   
   # Use only the upper triangle of data (to avoid repetition)
   get_upper_tri <- function(cormat){
@@ -739,8 +734,8 @@ for(h in 1:2){ # Loop through right and left handers
   upper_tri <- get_upper_tri(cormat)
   
   # Melt into long format
-  melted_cormat <- melt(upper_tri, na.rm=T, value.name='cor')
-  colnames(melted_cormat)[1:2]<-c('Var1','Var2') #names of cols 1 and 2
+  melted_cormat <- melt(upper_tri, na.rm=T, value.name="cor")
+  colnames(melted_cormat)[1:2]<-c("Var1","Var2") #names of cols 1 and 2
   melted_cormat$Hand <- h
   
   both_cormats <- rbind(both_cormats, melted_cormat)
@@ -748,7 +743,7 @@ for(h in 1:2){ # Loop through right and left handers
 both_cormats <- both_cormats[-1,]
 both_cormats$Hand <- as.factor(both_cormats$Hand)
 both_cormats$Hand <- factor(both_cormats$Hand, levels(both_cormats$Hand)[c(2,1)])
-levels(both_cormats$Hand) <- c('Left Handed','Right Handed')
+levels(both_cormats$Hand) <- c("Left Handed","Right Handed")
 
 # Create correlation heatmap using ggplot
 ggheatmap <- ggplot(data = both_cormats, aes(Var2, Var1, fill = cor)) +
@@ -757,8 +752,8 @@ ggheatmap <- ggplot(data = both_cormats, aes(Var2, Var1, fill = cor)) +
                        midpoint = 0, limit = c(-1, 1), space = "Lab", 
                        name="Pearson Correlation") +
   theme_minimal() + 
-  theme(axis.text.x = element_text(vjust = 1, size = 10, hjust = 0.5, colour = 'black'),
-        axis.text.y = element_text(vjust = 0.5, size = 10, hjust = 1, colour = 'black')) +
+  theme(axis.text.x = element_text(vjust = 1, size = 10, hjust = 0.5, colour = "black"),
+        axis.text.y = element_text(vjust = 0.5, size = 10, hjust = 1, colour = "black")) +
   coord_fixed() +
   facet_grid(.~Hand)
 
@@ -767,21 +762,21 @@ my_cormat <- ggheatmap +
   geom_text(aes(Var2, Var1, label = cor), color = "black", size = 4) +
   theme(
     axis.title.x = element_blank(), axis.title.y = element_blank(),
-    panel.grid.major = element_blank(), panel.border = element_rect(colour = 'black', fill = NA),
-    #panel.background = element_rect(fill = 'grey'),
+    panel.grid.major = element_blank(), panel.border = element_rect(colour = "black", fill = NA),
+    #panel.background = element_rect(fill = "grey"),
     axis.ticks = element_blank(),
-    legend.position = 'bottom',
+    legend.position = "bottom",
     legend.direction = "horizontal",
     legend.text = element_text(size = 12),
     legend.title = element_text(size = 14),
     strip.text.x = element_text(size = 20),
-    strip.background = element_rect(fill = 'grey90', colour = 'black')) +
+    strip.background = element_rect(fill = "grey90", colour = "black")) +
   guides(fill = guide_colorbar(barwidth = 9, barheight = 1,
                                title.position = "top", title.hjust = 0.5))
 
 print(my_cormat)
 
-ggsave(filename = 'Figure3.png', dpi=300, plot = my_cormat, width = 10, height = 6)
+ggsave(filename = "Figure3.png", dpi=300, plot = my_cormat, width = 10, height = 6)
 ```
 
 
@@ -791,19 +786,19 @@ ggsave(filename = 'Figure3.png', dpi=300, plot = my_cormat, width = 10, height =
 scatter1 <- alltask[ , 1:6] %>% gather(key = Task, value = Session1)
 scatter2 <- alltask[ , 7:12] %>% gather(key = Task, value = Session2)
 
-scatterdata <- data.frame('Study' = as.factor(particdat$study), 'ID' = particdat$ID, 'Hand' = particdat$handedness,
-                          'Session1' = scatter1$Session1, 'Session2' = scatter2$Session2, 
-                          'Task' = rep(LETTERS[1:6], each = nsubj_final))
+scatterdata <- data.frame("Study" = as.factor(particdat$study), "ID" = particdat$ID, "Hand" = particdat$handedness,
+                          "Session1" = scatter1$Session1, "Session2" = scatter2$Session2, 
+                          "Task" = rep(LETTERS[1:6], each = nsubj_final))
 scatterdata$Task <- as.factor(scatterdata$Task)
 
 myscatter <- ggplot(data = scatterdata, aes(x = Session1, y = Session2, colour = Hand)) +
   geom_point(alpha = 0.7) + theme_bw() + geom_abline(intercept = 0, slope = 1) + ylim(-6,6) + xlim(-6,6) + 
   facet_wrap(~Task) 
-  #geom_text(aes(x = 3, y = -3, label = 'Testing...'))
+  #geom_text(aes(x = 3, y = -3, label = "Testing..."))
 
 print(myscatter)
 
-ggsave(filename = 'Figure4.png', dpi=300, plot = myscatter, width = 10, height = 6)
+ggsave(filename = "Figure4.png", dpi=300, plot = myscatter, width = 10, height = 6)
 ```
 
 
@@ -835,7 +830,7 @@ Keep left and right handers separate to start so that we can see if the same mod
 #=================================================================================#
 # Select RH data
 RH_row <- which(particdat$handcode == 1)
-dataRaw_RH <- mxData(observed = alltask[RH_row, ], type = 'raw')
+dataRaw_RH <- mxData(observed = alltask[RH_row, ], type = "raw")
 
 #  Select LH data
 LH_row <- which(particdat$handcode == 2)
@@ -849,24 +844,24 @@ Model1RH <- umxRAM("Model1RH", data=dataRaw_RH, suffix = "_RH",
                    # Factor loadings
                    umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_RH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
                    # Factor variances: F1 free
-                   umxPath(var='F1', freeAt=1),
+                   umxPath(var="F1", freeAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
-                   umxPath(means=c('F1'),fixedAt = 0))
+                   umxPath(means=c("F1"),fixedAt = 0))
 
 # Define Model1_LH
 Model1LH <- umxRAM("Model1LH", data=dataRaw_LH, suffix = "_LH",
                    # Factor loadings
                    umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6,"_LH"), free = c(F,T,T,T,T,T), values = rep(1,6)),
                    # Factor variances: F1 free
-                   umxPath(var='F1', freeAt=1),
+                   umxPath(var="F1", freeAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
-                   umxPath(means=c('F1'),fixedAt = 0))
+                   umxPath(means=c("F1"),fixedAt = 0))
 
 #=================================================================================#
 # Two Factor Models
@@ -879,13 +874,13 @@ Model2RH <- umxRAM("Model2RH", data=dataRaw_RH, suffix = "_RH",
                    # Factor covariances: fixed to zero 
                    umxPath(cov = c("F1", "F2"),fixedAt=0),
                    # Factor variances: F1 free, F2 fixed at 1
-                   umxPath(var='F1', freeAt=1),
-                   umxPath(var='F2', fixedAt=1),
+                   umxPath(var="F1", freeAt=1),
+                   umxPath(var="F2", fixedAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
-                   umxPath(means=c('F1','F2'),fixedAt = 0))
+                   umxPath(means=c("F1","F2"),fixedAt = 0))
 
 # Define Model2_LH
 Model2LH <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
@@ -895,13 +890,13 @@ Model2LH <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
                    # Factor covariances: fixed to zero 
                    umxPath(cov = c("F1", "F2"),fixedAt=0),
                    # Factor variances: F1 free, F2 fixed at 1
-                   umxPath(var='F1', freeAt=1),
-                   umxPath(var='F2', fixedAt=1),
+                   umxPath(var="F1", freeAt=1),
+                   umxPath(var="F2", fixedAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
-                   umxPath(means=c('F1','F2'),fixedAt = 0))
+                   umxPath(means=c("F1","F2"),fixedAt = 0))
 
 #=================================================================================#
 # Model comparison
@@ -927,17 +922,17 @@ This chunk drops one subject in each iteration and runs Model 4 (single factor) 
 factor_loadings_1 <- umxPath("F1", to = mylabels, labels = paste0("F1_to_",1:6), free = c(F,T,T,T,T,T), values = rep(1,6))
 factor_loadings_2 <- umxPath("F2",to = mylabels, labels = paste0("F2_to_",1:6), free = c(F,T,T,T,T,T), values = c(0,rep(1,5)))
 factor_covariances <- umxPath(cov = c("F1", "F2"),fixedAt=0)
-factor_variances_1 <- umxPath(var='F1', freeAt=1)
-factor_variances_2 <- umxPath(var='F2', fixedAt=1)
+factor_variances_1 <- umxPath(var="F1", freeAt=1)
+factor_variances_2 <- umxPath(var="F2", fixedAt=1)
 residual_variances <- umxPath(var=mylabels, labels = paste0("var_",1:6), freeAt=1)
 indicator_means <- umxPath(means=mylabels, labels = paste0("mean_",1:6), freeAt=1)
-factor_means_1 <- umxPath(means=c('F1'),fixedAt = 0)
-factor_means_2 <- umxPath(means=c('F1','F2'),fixedAt = 0)
+factor_means_1 <- umxPath(means=c("F1"),fixedAt = 0)
+factor_means_2 <- umxPath(means=c("F1","F2"),fixedAt = 0)
 
 #=================================================================================#
 # Drop-one loop
 
-#Use'drop one' approach - reduce the dataset by one on each run
+#Use"drop one" approach - reduce the dataset by one on each run
 for (group in 1:2){
   
   # Select subjects
@@ -961,7 +956,7 @@ for (group in 1:2){
     summary.Model1 <- summary(mxRun(mysum1))
     
     # Estimate Factor 2 model
-    myModel2 <- umxRAM('myModel2', data=dataRaw,
+    myModel2 <- umxRAM("myModel2", data=dataRaw,
                        factor_loadings_1, factor_loadings_2, factor_covariances, factor_variances_1, factor_variances_2,
                        residual_variances, indicator_means, factor_means_2,autoRun = FALSE)
     mysum2<-mxRun(myModel2)
@@ -979,12 +974,12 @@ for (group in 1:2){
 
   }
   
-    colnames(dropone_results) <- c('BIC_mod1','BIC_mod2','chi.diff','df.diff','p.diff')
+    colnames(dropone_results) <- c("BIC_mod1","BIC_mod2","chi.diff","df.diff","p.diff")
     dropone_results<-data.frame(dropone_results)
     dropone_results$BIC_diff <- dropone_results$BIC_mod1 - dropone_results$BIC_mod2
-    dropone_results$bestModel<-'one factor'
+    dropone_results$bestModel<-"one factor"
     w<-which(dropone_results$p.diff < .05 & dropone_results$BIC_diff > 0)
-    dropone_results$bestModel[w]<-'bifactor'
+    dropone_results$bestModel[w]<-"bifactor"
     
   if (group == 1){dropone_results_RH <- dropone_results}
   if (group == 2){dropone_results_LH <- dropone_results}
@@ -1013,13 +1008,13 @@ Model2RH_con <- umxRAM("Model2RH", data=dataRaw_RH, suffix = "_RH",
                    # Factor covariances: fixed to zero 
                    umxPath(cov = c("F1", "F2"),fixedAt=0),
                    # Factor variances: F1 free, F2 fixed at 1
-                   umxPath(var='F1', freeAt=1),
-                   umxPath(var='F2', fixedAt=1),
+                   umxPath(var="F1", freeAt=1),
+                   umxPath(var="F2", fixedAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_RH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_RH"), freeAt=1),
-                   umxPath(means=c('F1','F2'),fixedAt = 0))
+                   umxPath(means=c("F1","F2"),fixedAt = 0))
 
 # Left handers
 Model2LH_con <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
@@ -1029,13 +1024,13 @@ Model2LH_con <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
                    # Factor covariances: fixed to zero 
                    umxPath(cov = c("F1", "F2"),fixedAt=0),
                    # Factor variances: F1 free, F2 fixed at 1
-                   umxPath(var='F1', freeAt=1),
-                   umxPath(var='F2', fixedAt=1),
+                   umxPath(var="F1", freeAt=1),
+                   umxPath(var="F2", fixedAt=1),
                    # Residual variances
                    umxPath(var=mylabels, labels = paste0("var_",1:6,"_LH"), freeAt=1),
                    # Means 
                    umxPath(means=mylabels, labels = paste0("mean_",1:6,"_LH"), freeAt=1),
-                   umxPath(means=c('F1','F2'),fixedAt = 0))
+                   umxPath(means=c("F1","F2"),fixedAt = 0))
 
 Model2_con_mg <- umxSuperModel("Model2_constrained", Model2RH_con, Model2LH_con)
 
@@ -1080,35 +1075,35 @@ myhighCI <- real_est_path + 1.96*real_est_se
 # Bear in mind that if you change the winning model, the indices below will also need to change!!
 
 Factor1_plot_data = data.frame(
-  'Task' = rep(c('A','B','C','D','E','F'), 2),
-  'Group' = rep(c('Left Handed', 'Right Handed'), each = 6), # Left handers first to make the plot work
-  'Loading' = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
+  "Task" = rep(c("A","B","C","D","E","F"), 2),
+  "Group" = rep(c("Left Handed", "Right Handed"), each = 6), # Left handers first to make the plot work
+  "Loading" = c(real_est_path[24:26],1,real_est_path[27:28], # Factor 1 loadings, LH
                 real_est_path[1:3],1,real_est_path[4:5]),    # Factor 1 loadings, RH
-  'lowCI' = c(mylowCI[24:26],1,mylowCI[27:28],               # Factor 1 low CI, LH
+  "lowCI" = c(mylowCI[24:26],1,mylowCI[27:28],               # Factor 1 low CI, LH
               mylowCI[1:3],1,mylowCI[4:5]),                  # Factor 1 low CI, RH
-  'highCI' = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
+  "highCI" = c(myhighCI[24:26],1,myhighCI[27:28],            # Factor 1 high CI, LH
                myhighCI[1:3],1,myhighCI[4:5])                # Factor 1 high CI, RH
 )
-Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c('A','B','C','D','E','F'))
+Factor1_plot_data$Task <- factor(Factor1_plot_data$Task, levels = c("A","B","C","D","E","F"))
 Factor1_plot_data$Group <- factor(Factor1_plot_data$Group)
-Factor1_plot_data$Factor<-rep('Factor 1',length(Factor1_plot_data[,1]))
+Factor1_plot_data$Factor<-rep("Factor 1",length(Factor1_plot_data[,1]))
 
 #=================================================================================#
 # Select Factor 2 loadings for plotting
 Factor2_plot_data = data.frame(
-  'Task' = rep(c('A','B','C','D','E','F'), 2),
-  'Group' = rep(c('Left Handed','Right Handed'), each = 6),
-  'Loading' = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
+  "Task" = rep(c("A","B","C","D","E","F"), 2),
+  "Group" = rep(c("Left Handed","Right Handed"), each = 6),
+  "Loading" = c(real_est_path[29:31],0,real_est_path[32:33], # Left Handers factor1 loadings
                 real_est_path[6:8],0,real_est_path[9:10]), # Right Handers factor 1 loadings
-  'lowCI' = c(mylowCI[29:31],0,mylowCI[32:33], # Left Handers factor1 low CI
+  "lowCI" = c(mylowCI[29:31],0,mylowCI[32:33], # Left Handers factor1 low CI
               mylowCI[6:8],0,mylowCI[9:10]), # Right Handers factor1 low CI
-  'highCI' = c(myhighCI[29:31],0,myhighCI[32:33],
+  "highCI" = c(myhighCI[29:31],0,myhighCI[32:33],
                myhighCI[6:8],0,myhighCI[9:10])
 )
 
-Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c('A','B','C','D','E','F'))
+Factor2_plot_data$Task <- factor(Factor2_plot_data$Task, levels = c("A","B","C","D","E","F"))
 Factor2_plot_data$Group <- factor(Factor2_plot_data$Group)
-Factor2_plot_data$Factor<-rep('Factor 2',length(Factor2_plot_data[,1]))
+Factor2_plot_data$Factor<-rep("Factor 2",length(Factor2_plot_data[,1]))
 
 Factor_plot_data<-rbind(Factor1_plot_data,Factor2_plot_data)
 Factor_plot_data$Factor<-as.factor(Factor_plot_data$Factor)
@@ -1119,11 +1114,11 @@ my_factor_both <- ggplot(Factor_plot_data, aes(x = Task, y = Loading, fill = Tas
   ylim(-1,2) +
   theme_bw() +
   geom_hline(yintercept = 0) +
-  ylab('Factor Loadings') +
-  facet_grid(Factor~Group) + theme(legend.position='none')
+  ylab("Factor Loadings") +
+  facet_grid(Factor~Group) + theme(legend.position="none")
 
 print(my_factor_both)
-ggsave(filename = 'Figure5.png', dpi=300, plot = my_factor_both, width = 6, height = 5) 
+ggsave(filename = "Figure5.png", dpi=300, plot = my_factor_both, width = 6, height = 5) 
 ```
 
 
@@ -1213,29 +1208,29 @@ facmod_LH <- lm(alltask$f1score[LH_row] ~ alltask$f2score[LH_row])
 alltask$cookdist[LH_row] <- cooks.distance(facmod_LH)
 
 
-plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = 'Cooks Distance', xlab = 'Participant')
+plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = "Cooks Distance", xlab = "Participant")
 w<-which(alltask$cookdist>(4*mean(alltask$cookdist)))
 abline(h=4*mean(alltask$cookdist), lty=2)
 abline(v=37.5, lty=2)
-text(x = 10, y = 0.14, labels = 'black = right handed\nred = left handed')
-cat('Influential points are:') # These values are ROW NUMBERS not PARTICIPANT IDs
+text(x = 10, y = 0.14, labels = "black = right handed\nred = left handed")
+cat("Influential points are:") # These values are ROW NUMBERS not PARTICIPANT IDs
 w
 alltask$bivoutlier <-1
 alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
-png('Figure6.png', width=6, height=5, units="in", res=300)
+png("Figure6.png", width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
 plot(alltask$f1score,alltask$f2score, pch=alltask$bivoutlier, col=particdat$handcode, 
-     xlab='Factor 1',ylab='Factor 2', xlim=c(-30, 30))
+     xlab="Factor 1",ylab="Factor 2", xlim=c(-30, 30))
 abline(v=0,lty=2)
 abline(h=0,lty=2)
-mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use='pairwise.complete.obs'), 3)
-mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use='pairwise.complete.obs'), 3)
-text(-14, 13, paste('Right Handers: r = ',mycor_RH))
-text(-14, 20, paste('Left Handers: r = ',mycor_LH), col='red')
+mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use="pairwise.complete.obs"), 3)
+mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use="pairwise.complete.obs"), 3)
+text(-14, 13, paste("Right Handers: r = ",mycor_RH))
+text(-14, 20, paste("Left Handers: r = ",mycor_LH), col="red")
 pData<-cbind(alltask,particdat)
-covEllipses(x=pData[,c('f1score','f2score')], group=pData$handcode, 
+covEllipses(x=pData[,c("f1score","f2score")], group=pData$handcode, 
             pooled=FALSE, add=TRUE, col=c("black","red"), labels="")
 
 dev.off()
@@ -1257,7 +1252,7 @@ Jacknife estimates considered for model SEs, which can be compared with standard
  jk_bias<-(n-1)*(avgpathmeans-real_est_path)
 
  jack_est<-(n*real_est_path)-((n-1)*avgpathmeans)
- pngname<-paste0('jacknifeplot_fix',myfixed,'.png')
+ pngname<-paste0("jacknifeplot_fix",myfixed,".png")
 png(pngname, width=4, height=4, units="in", res=300)
 
  plot(real_est_path,jack_est)
@@ -1272,7 +1267,7 @@ png(pngname, width=4, height=4, units="in", res=300)
    jack_SE[i]<-sqrt(((n-1)/n)*sum((dropone_paths[,i]-avgpathmeans[i])^2))
  }
  myres<-data.frame(real_est_path)
- colnames(myres)[1]<-'Estimate'
+ colnames(myres)[1]<-"Estimate"
  myres$L_ci<-round(real_est_path-1.65*real_est_se,2)
  myres$U_ci<-round(real_est_path+1.65*real_est_se,2)
  myres$jack_Estimate<-round(jack_est,2)
@@ -1282,7 +1277,7 @@ png(pngname, width=4, height=4, units="in", res=300)
  myres$jk_bias<-round(jk_bias,2)
  myres$Estimate<-round(myres$Estimate,2)
 
- plot(myres$Estimate,myres$jack_Estimate,main ='Jacknife analysis')
+ plot(myres$Estimate,myres$jack_Estimate,main ="Jacknife analysis")
  write.csv(myres,"jacknife_ests.csv")
 
 ```
@@ -1337,45 +1332,45 @@ apa_PT<-function (test.object, tails = 2, sig.digits = 5, p.lb = 0.01)
 mydiff<-(alltaskall$SentGen1+alltaskall$SentGen2)/2-(alltaskall$ListGen1+alltaskall$ListGen2)/2
 
 particdat$handcode<-as.factor(particdat$handcode)
-levels(particdat$handcode)<-c('R','L')
+levels(particdat$handcode)<-c("R","L")
 
 # Does this difference vary with handedness?
-cat('Does this difference vary with handedness?','\n')
-cat(apa_PT(t.test(mydiff~particdat$handcode)),'\n')
-plot(mydiff~particdat$handcode,main=apa_PT(t.test(mydiff~particdat$handcode)),xlab='Hand',ylab='Difference score')
-cat('\n')
+cat("Does this difference vary with handedness?","\n")
+cat(apa_PT(t.test(mydiff~particdat$handcode)),"\n")
+plot(mydiff~particdat$handcode,main=apa_PT(t.test(mydiff~particdat$handcode)),xlab="Hand",ylab="Difference score")
+cat("\n")
 # Which other tasks vary with handedness?
-cat('Which other tasks vary with handedness?','\n')
+cat("Which other tasks vary with handedness?","\n")
 
 taskA_LG<-(alltaskall$ListGen1+alltaskall$ListGen2)/2
-cat('Task A: ',apa_PT(t.test(taskA_LG~particdat$handcode)),'\n')
-plot(taskA_LG~particdat$handcode,main=apa_PT(t.test(taskA_LG~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat("Task A: ",apa_PT(t.test(taskA_LG~particdat$handcode)),"\n")
+plot(taskA_LG~particdat$handcode,main=apa_PT(t.test(taskA_LG~particdat$handcode)),xlab="Hand",ylab="Difference score")
 
 taskB_PD<-(alltaskall$PhonDec1+alltaskall$PhonDec2)/2
-cat('Task B: ',apa_PT(t.test(taskB_PD~particdat$handcode)),'\n')
-plot(taskB_PD~particdat$handcode,main=apa_PT(t.test(taskB_PD~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat("Task B: ",apa_PT(t.test(taskB_PD~particdat$handcode)),"\n")
+plot(taskB_PD~particdat$handcode,main=apa_PT(t.test(taskB_PD~particdat$handcode)),xlab="Hand",ylab="Difference score")
 
 taskC_SD<-(alltaskall$SemDec1+alltaskall$SemDec2)/2
-cat('Task C: ', apa_PT(t.test(taskC_SD~particdat$handcode)),'\n')
-plot(taskC_SD~particdat$handcode,main=apa_PT(t.test(taskC_SD~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat("Task C: ", apa_PT(t.test(taskC_SD~particdat$handcode)),"\n")
+plot(taskC_SD~particdat$handcode,main=apa_PT(t.test(taskC_SD~particdat$handcode)),xlab="Hand",ylab="Difference score")
 
 taskD_SG<-(alltaskall$SentGen1+alltaskall$SentGen2)/2
-cat('Task D: ',apa_PT(t.test(taskD_SG~particdat$handcode)),'\n')
-plot(taskD_SG~particdat$handcode,main=apa_PT(t.test(taskD_SG~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat("Task D: ",apa_PT(t.test(taskD_SG~particdat$handcode)),"\n")
+plot(taskD_SG~particdat$handcode,main=apa_PT(t.test(taskD_SG~particdat$handcode)),xlab="Hand",ylab="Difference score")
 
 taskE_SC<-(alltaskall$SentComp1+alltaskall$SentComp2)/2
-cat('Task E: ', apa_PT(t.test(taskE_SC~particdat$handcode)),'\n')
-plot(taskE_SC~particdat$handcode,main=apa_PT(t.test(taskE_SC~particdat$handcode)),xlab='Hand',ylab='Difference score')
+cat("Task E: ", apa_PT(t.test(taskE_SC~particdat$handcode)),"\n")
+plot(taskE_SC~particdat$handcode,main=apa_PT(t.test(taskE_SC~particdat$handcode)),xlab="Hand",ylab="Difference score")
 
 taskF_JD<-(alltaskall$Jabber1+alltaskall$Jabber2)/2
-cat('Task F: ', apa_PT(t.test(taskF_JD~particdat$handcode)),'\n')
-plot(taskF_JD~particdat$handcode,main=apa_PT(t.test(taskF_JD~particdat$handcode)),xlab='Hand',ylab='Difference score')
-cat('\n')
+cat("Task F: ", apa_PT(t.test(taskF_JD~particdat$handcode)),"\n")
+plot(taskF_JD~particdat$handcode,main=apa_PT(t.test(taskF_JD~particdat$handcode)),xlab="Hand",ylab="Difference score")
+cat("\n")
 # Do factor scores vary with handedness?
-cat('Do factor scores vary with handedness?','\n')
-cat('FACTOR 1: ', apa_PT(t.test(alltask$f1score~particdat$handcode)),'\n')
-cat('FACTOR 2: ', apa_PT(t.test(alltask$f2score~particdat$handcode)),'\n')
-cat('\n')
+cat("Do factor scores vary with handedness?","\n")
+cat("FACTOR 1: ", apa_PT(t.test(alltask$f1score~particdat$handcode)),"\n")
+cat("FACTOR 2: ", apa_PT(t.test(alltask$f2score~particdat$handcode)),"\n")
+cat("\n")
 
 # # Count how many tasks a subject is left lateralised for
 # for (i in 1:nrow(alltask)){
@@ -1386,9 +1381,9 @@ cat('\n')
 # }
 
 # Does the number of left lateralised tasks per participant vary with handedness?
-# cat('Does the number of left lateralised tasks per participant vary with handedness?','\n')
+# cat("Does the number of left lateralised tasks per participant vary with handedness?","\n")
 # kable(table(alltask$Nleftlat,particdat$handcode))
-# cat(apa_PT(t.test(alltask$Nleftlat~particdat$handcode)),'\n')
+# cat(apa_PT(t.test(alltask$Nleftlat~particdat$handcode)),"\n")
 
   
   # # Not sure what this is doing....
