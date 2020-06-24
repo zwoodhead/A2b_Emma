@@ -28,8 +28,6 @@ remove.Ntrial     <- 1 # Set to 1 to run exclusion of those with < 12 good trial
 
 ########################################################################################################
 
-#Needs OpenMx, which you get with following command (not CRAN)
-#source("https://openmx.ssri.psu.edu/software/getOpenMx.R")
 library(tidyverse)
 library(OpenMx)
 library(umx)
