@@ -8,7 +8,6 @@
 # Install packages. If you get an error here you may need to install the required packages first
 
 require(readxl) # xlsx did not work on Macs - you may need to install java first. See java.com 
-require(writexl)
 require(tidyverse)
 require(osfr)
 
@@ -18,8 +17,8 @@ require(osfr)
 # Download and unzip the data zip files. 
 # NB: it will not overwrite existing files
 
-osf_retrieve_file('https://osf.io/jt2ca') %>% osf_download(conflicts = 'skip') # A2_Oxford_fTCD_Data.zip
-osf_retrieve_file("https://osf.io/zuctb") %>% osf_download(conflicts = 'skip') # A2_Bangor_fTCD_data.zip 
+osf_retrieve_file("https://osf.io/jt2ca") %>% osf_download(conflicts = "skip") # A2_Oxford_fTCD_Data.zip
+osf_retrieve_file("https://osf.io/zuctb") %>% osf_download(conflicts = "skip") # A2_Bangor_fTCD_data.zip 
 unzip ("A2_Oxford_fTCD_Data.zip", exdir = ".", overwrite = FALSE)
 unzip ("A2_Bangor_fTCD_data.zip", exdir = ".", overwrite = FALSE)
 
@@ -69,7 +68,7 @@ ntasks <- length(tasks)
 # Specify subjects
 
 # Read in Triallist to get list of subject IDs
-osf_retrieve_file('https://osf.io/pvb57') %>%  osf_download(conflicts = 'skip')
+osf_retrieve_file("https://osf.io/pvb57") %>%  osf_download(conflicts = "skip")
 trialloc<-"Triallist_Combined.xlsx" # File lists all subjects and trial inclusions/exclusions
 triallist <- read_excel(trialloc, sheet=2)
 
@@ -89,8 +88,8 @@ triallist <- triallist[-excluded_subjects, ]
 # Create matrices for results
 resultsloc1 <- "Results_Combined_Session1.csv" # File name for Results from session 1
 resultsloc2 <- "Results_Combined_Session2.csv" # File name for Results from session 1
-osf_retrieve_file('https://osf.io/zuj6x') %>% osf_download(conflicts = 'skip')
-mycolumns<- read.csv('col_names.txt', header=FALSE)
+osf_retrieve_file("https://osf.io/zuj6x") %>% osf_download(conflicts = "skip")
+mycolumns<- read.csv("col_names.txt", header=FALSE)
 results2 <- results1 <- as.data.frame(matrix(data=NA, nrow=nsubj, ncol=91))
 colnames(results1) <- mycolumns[1:91, ]
 colnames(results2) <- mycolumns[92:182, ]
@@ -125,7 +124,7 @@ for (mysub in 1:length(included_subjects)){
     
     # Read exp data
     dataloc <- paste(mydir,"A2_",mysubname,"_",task,session,".exp", sep = "")
-    dat<-read.table(dataloc, skip = 6,  header =FALSE, sep ='\t')
+    dat<-read.table(dataloc, skip = 6,  header =FALSE, sep ="\t")
     wantcols = c(2,3,4,9) #sec, L, R,marker #select columns of interest to put in shortdat
     shortdat = data.frame(dat[,wantcols])
     colnames(shortdat) = c ("csec","L","R","marker")
@@ -146,7 +145,7 @@ for (mysub in 1:length(included_subjects)){
       z=rawdata$R[3000:5000]
       w=rawdata$marker[3000:5000]
       
-      plot(x,y, type="n") #set up plot - doesn't actually plot anything
+      plot(x,y, type="n") #set up plot - doesn"t actually plot anything
       lines(x,y,col="red")
       lines(x,z,col="blue")
       lines(x,w)
@@ -156,7 +155,7 @@ for (mysub in 1:length(included_subjects)){
     }
     
     #-----------------------------------------------------------
-    #Now find markers; place where 'marker' column goes from low to high value
+    #Now find markers; place where "marker" column goes from low to high value
     #-----------------------------------------------------------
     mylen = nrow(rawdata); # Number of timepoints in filtered data (rawdata)
     markerplus = c(0 ,rawdata$marker); # create vectors with offset of one
@@ -168,16 +167,16 @@ for (mysub in 1:length(included_subjects)){
     norigmarkers = length(origmarkerlist)
     
     if (origmarkerlist[norigmarkers] > (mylen-postpoints))
-    {myaddcomment<-paste('. Short last epoch in run')
+    {myaddcomment<-paste(". Short last epoch in run")
     mycomment<-paste(mycomment,myaddcomment)
     } # indicates if there is a short last epoch; this may need disposing of
     
     excessmarkers=norigmarkers-trialsperrun
     # indicates if there are excess markers; hopefully these are practice trials. 
-    # If the quantity does not indicate this, a comment is made in the 'Dispose of practice trials' 
-    # section below. Also, check there aren't fewer than expected, and comment on this
+    # If the quantity does not indicate this, a comment is made in the "Dispose of practice trials" 
+    # section below. Also, check there aren"t fewer than expected, and comment on this
     if (excessmarkers<0)
-    {mycomment<-paste(mycomment,'. Fewer markers than expected')
+    {mycomment<-paste(mycomment,". Fewer markers than expected")
     }
     
     # Check that markers are at least 32 s apart
@@ -187,7 +186,7 @@ for (mysub in 1:length(included_subjects)){
     # but may be longer if recording interrupted. Shorter intervals indicate there have been spurious 
     # markers which will need dealing with
     if(min(intervals<32))
-    {myaddcomment<-paste('. Possible spurious markers')
+    {myaddcomment<-paste(". Possible spurious markers")
     mycomment<-paste(mycomment,myaddcomment)
     }
     
@@ -200,9 +199,9 @@ for (mysub in 1:length(included_subjects)){
     {
       if(excessmarkers==practicerun1) {
         markerlist<-origmarkerlist[(excessmarkers+1):(length(origmarkerlist))]
-        mycomment<-paste(mycomment,'. Practice trials run 1 found and removed')
+        mycomment<-paste(mycomment,". Practice trials run 1 found and removed")
       } else {
-        myaddcomment<-paste(excessmarkers,'. Unexpected markers found in run 1, investigate')
+        myaddcomment<-paste(excessmarkers,". Unexpected markers found in run 1, investigate")
         mycomment<-paste(mycomment,myaddcomment)
         markerlist<-origmarkerlist[(excessmarkers+1):(length(origmarkerlist))] #If unexpected extra markers
         # found, drop earlier ones until maximum possible markers are retained; then continue
@@ -266,7 +265,7 @@ for (mysub in 1:length(included_subjects)){
       index2=markerlist[mym]+postpoints # index2 is the index of the timepoint at the end of the epoch
       
       # If recording started late, the start of the epoch for trial 1 will be beyond the recorded range. 
-      # If this doesn't affect the baseline period (ie, results will be unaffected), then replace with mean
+      # If this doesn"t affect the baseline period (ie, results will be unaffected), then replace with mean
       if (index1 < 0 & markerlist[mym]+basestartpoint > 0){
         cat("Recording started late. Padding start with zeros", "\n")
         replacement_mean_left = mean(rawdata[0:index2,2]) # Left hemisphere mean
@@ -322,30 +321,30 @@ for (mysub in 1:length(included_subjects)){
         #first plot the old values with no correction
         myylim <- range(c(range(na.omit(myplotbit[,1])),range(na.omit(myplotbit[,2]))))
         
-        plot(timeline+premarker,myplotbit[,1],type="n",xlab='time (secs)',ylab='velocity',ylim=myylim)
+        plot(timeline+premarker,myplotbit[,1],type="n",xlab="time (secs)",ylab="velocity",ylim=myylim)
         lines(timeline+premarker,myplotbit[,1],col="red")
         lines(timeline+premarker,myplotbit[,2],col="blue")
         
         #then overplot the corrected values in different colours
-        lines(timeline+premarker,myepoched[mym,,1,1],col='pink')
-        lines(timeline+premarker,myepoched[mym,,2,1],col='lightblue')
+        lines(timeline+premarker,myepoched[mym,,1,1],col="pink")
+        lines(timeline+premarker,myepoched[mym,,2,1],col="lightblue")
         abline(v=basestart)
         abline(v=baseend)
         abline(v=poistart)
         abline(v=poiend)
         
-        mytitle=paste(mysubname, 'Trial:', mym,'Include = ',myinclude[mym])
+        mytitle=paste(mysubname, "Trial:", mym,"Include = ",myinclude[mym])
         title(mytitle)
         location1<-range(mybit)[2]-20
         location2<-range(mybit)[2]-80
-        text(0,location1,'Red/blue values in POI have been overwritten with mean',cex=.7)
-        text(0,location2,'1 = included; 0 = pre-excluded, -1 = rejected',cex=.7);
+        text(0,location1,"Red/blue values in POI have been overwritten with mean",cex=.7)
+        text(0,location2,"1 = included; 0 = pre-excluded, -1 = rejected",cex=.7);
         cat("Press 9 for manual exclusion. Press 8 to retain excluded (-1). To retain current inclusion/exclusion status, press 1")
         myoverride <- as.integer(readline(prompt = ""))
         
-        # These if statements process the user's manual responses 
+        # These if statements process the user"s manual responses 
         if(is.na(myoverride)) # If the user presses enter but fails to press a number,
-        {myoverride=1  # myoverride is coded as '1'to prevent crashing.
+        {myoverride=1  # myoverride is coded as "1"to prevent crashing.
         }              # This means exclusion/inclusion is retained according to the automated system. 
         if(myoverride>1)
         {if(myoverride==9)
@@ -353,7 +352,7 @@ for (mysub in 1:length(included_subjects)){
           if(myoverride==8)
           {myinclude[mym]=1
           }
-          myaddcomment<-paste('. Manual override',myoverride,'trial',mym)
+          myaddcomment<-paste(". Manual override",myoverride,"trial",mym)
           mycomment<-paste(mycomment,myaddcomment)}
       }
       
@@ -379,8 +378,8 @@ for (mysub in 1:length(included_subjects)){
     # Multiply by 100 and divide by overall mean value
     # ensures results are independent of angle of insonation
     #----------------------------------------------------------
-    meanL=mean(myepoched[,,1,1], na.rm='TRUE')
-    meanR=mean(myepoched[,,2,1], na.rm='TRUE')
+    meanL=mean(myepoched[,,1,1], na.rm="TRUE")
+    meanR=mean(myepoched[,,2,1], na.rm="TRUE")
     myepoched[,,1,2]=(100*myepoched[,,1,1])/meanL #last dim of myepoched is 2 for the normalised data
     myepoched[,,2,2]=(100*myepoched[,,2,1])/meanR
     
@@ -399,10 +398,10 @@ for (mysub in 1:length(included_subjects)){
     #---------------------------------------------------------
     if(initialdatacheck1==1)
     {for(mym in 1:nmarkers2)
-    {plot(timeline+premarker,myepoched[mym,,1,2],type="n",xlab='time (secs)',ylab='velocity')
-      lines(timeline+premarker,myepoched[mym,,1,2],col='pink')
-      lines(timeline+premarker,myepoched[mym,,2,2],col='lightblue')
-      title('After normalization')
+    {plot(timeline+premarker,myepoched[mym,,1,2],type="n",xlab="time (secs)",ylab="velocity")
+      lines(timeline+premarker,myepoched[mym,,1,2],col="pink")
+      lines(timeline+premarker,myepoched[mym,,2,2],col="lightblue")
+      title("After normalization")
       cat("Press [enter] to continue")
       line <- readline()
     }
@@ -454,10 +453,10 @@ for (mysub in 1:length(included_subjects)){
     #----------------------------------------------------------
     if (initialdatacheck2==1)
     {for(mym in 1:nmarkers2 )
-    {plot(timeline+premarker,myepoched[mym,,1,3],type="n",xlab='time (secs)',ylab='velocity')
-      lines(timeline+premarker,myepoched[mym,,1,3],col='pink')
-      lines(timeline+premarker,myepoched[mym,,2,3],col='lightblue')
-      mytitle=paste('Trial after heart beat correction, trial =', mym)
+    {plot(timeline+premarker,myepoched[mym,,1,3],type="n",xlab="time (secs)",ylab="velocity")
+      lines(timeline+premarker,myepoched[mym,,1,3],col="pink")
+      lines(timeline+premarker,myepoched[mym,,2,3],col="lightblue")
+      mytitle=paste("Trial after heart beat correction, trial =", mym)
       title(mytitle)
       cat ("Press [enter] to continue")
       line <- readline()
@@ -484,12 +483,12 @@ for (mysub in 1:length(included_subjects)){
     #--------------------------------------------------------
     if(initialdatacheck3==1)
     {for(mym in 1:nmarkers2 )
-    {plot(timeline+premarker,myepoched[mym,,1,4],type="n",xlab='time (secs)',ylab='velocity')
-      lines(timeline+premarker,myepoched[mym,,1,4],col='red')
-      lines(timeline+premarker,myepoched[mym,,2,4],col='blue')
-      mytitle=paste('Trial after baseline correction, trial =',mym)
+    {plot(timeline+premarker,myepoched[mym,,1,4],type="n",xlab="time (secs)",ylab="velocity")
+      lines(timeline+premarker,myepoched[mym,,1,4],col="red")
+      lines(timeline+premarker,myepoched[mym,,2,4],col="blue")
+      mytitle=paste("Trial after baseline correction, trial =",mym)
       title(mytitle)
-      text(-5,110,'blue=R\n red=L\n',cex=.75)
+      text(-5,110,"blue=R\n red=L\n",cex=.75)
       cat ("Press [enter] to continue")
       line <- readline()
     }
@@ -604,16 +603,16 @@ for (mysub in 1:length(included_subjects)){
     
     if (initialdatacheck4==1)
     {
-    plot(timelinelong,Lmean, type="n",ylab='mean blood flow',xlab='time(s)',ylim=c(90,120)) #set up plot - doesn't actually plot anything
-    lines(timelinelong,Lmean,col='red')
-    lines(timelinelong,Rmean,col='blue')
-    lines(timelinelong,(100+LRdiff),col='black')
-    abline(v = poistart, lty = 2, col = 'green')
-    abline(v = poiend, lty = 2, col = 'green')
+    plot(timelinelong,Lmean, type="n",ylab="mean blood flow",xlab="time(s)",ylim=c(90,120)) #set up plot - doesn"t actually plot anything
+    lines(timelinelong,Lmean,col="red")
+    lines(timelinelong,Rmean,col="blue")
+    lines(timelinelong,(100+LRdiff),col="black")
+    abline(v = poistart, lty = 2, col = "green")
+    abline(v = poiend, lty = 2, col = "green")
     abline(v = basestart, lty = 2)
     abline(v = baseend, lty = 2)
-    abline(v = mylatency, lty = 2, col = 'magenta')
-    text(-4,110,'blue=R\n red=L\n black=(L-R) +100',cex=.75)
+    abline(v = mylatency, lty = 2, col = "magenta")
+    text(-4,110,"blue=R\n red=L\n black=(L-R) +100",cex=.75)
     title(mytitle)
 
     cat ("Press [enter] to continue")
@@ -621,16 +620,16 @@ for (mysub in 1:length(included_subjects)){
     
     png(filename=paste0("LI_Plots/LI_Plot_",mysubname,"_",task,session,".png"))
 
-    plot(timelinelong,Lmean, type="n",ylab='mean blood flow',xlab='time(s)',ylim=c(90,120)) #set up plot - doesn't actually plot anything
-    lines(timelinelong,Lmean,col='red')
-    lines(timelinelong,Rmean,col='blue')
-    lines(timelinelong,(100+LRdiff),col='black')
-    abline(v = poistart, lty = 2, col = 'green')
-    abline(v = poiend, lty = 2, col = 'green')
+    plot(timelinelong,Lmean, type="n",ylab="mean blood flow",xlab="time(s)",ylim=c(90,120)) #set up plot - doesn"t actually plot anything
+    lines(timelinelong,Lmean,col="red")
+    lines(timelinelong,Rmean,col="blue")
+    lines(timelinelong,(100+LRdiff),col="black")
+    abline(v = poistart, lty = 2, col = "green")
+    abline(v = poiend, lty = 2, col = "green")
     abline(v = basestart, lty = 2)
     abline(v = baseend, lty = 2)
-    abline(v = mylatency, lty = 2, col = 'magenta')
-    text(-4,105,'blue=R\n red=L\n black=(L-R) +100',cex=.75)
+    abline(v = mylatency, lty = 2, col = "magenta")
+    text(-4,105,"blue=R\n red=L\n black=(L-R) +100",cex=.75)
     mytitle=paste(mysubname,paste("Task ", task, session, sep = ""))
     title(mytitle)
 
@@ -681,7 +680,7 @@ write.csv(results1, file = resultsloc1, row.names=F)
 write.csv(results2, file = resultsloc2, row.names=F)
 
 # Tidy up
-if(file.exists('Bangor_data.zip')){file.remove('Bangor_data.zip')}
-if(file.exists('Oxford_data.zip')){file.remove('Oxford_data.zip')}
+if(file.exists("Bangor_data.zip")){file.remove("Bangor_data.zip")}
+if(file.exists("Oxford_data.zip")){file.remove("Oxford_data.zip")}
   
   
