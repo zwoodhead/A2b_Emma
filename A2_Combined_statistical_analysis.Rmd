@@ -12,17 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 This script reads in data from A2 study (from dropbox) and new data acquired at Bangor (stored locally), and performs basic summary statistics followed by SEM analysis of the laterality indices.
 
-*Before you start*
-The following files need to downloaded from OSF (https://osf.io/qetj5/files/) and saved to the working directory:
-
-*A2_Participant_Info_Bangor.csv
-*Bangor_Results_Session1.csv
-*Bangor_Results_Session2.csv
-*A2_Behavioural_Data_Bangor.csv
-The following script needs to be pulled from github:
-*geom_pirate_ZW.R
-The following package needs to be installed manually:
-*devtools::install_github("mikabr/ggpirate")
 
 ## Set variables and load packages
 
