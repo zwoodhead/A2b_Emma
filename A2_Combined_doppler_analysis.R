@@ -91,15 +91,17 @@ resultsloc1 <- "Results_Combined_Session1.csv" # File name for Results from sess
 resultsloc2 <- "Results_Combined_Session2.csv" # File name for Results from session 1
 osf_retrieve_file('https://osf.io/zuj6x') %>% osf_download(conflicts = 'skip')
 mycolumns<- read.csv('col_names.txt', header=FALSE)
-results2 <- results1 <- matrix(data=NA, nrow=nsubj, ncol=91)
+results2 <- results1 <- as.data.frame(matrix(data=NA, nrow=nsubj, ncol=91))
 colnames(results1) <- mycolumns[1:91, ]
 colnames(results2) <- mycolumns[92:182, ]
 
+results2$Filename <- results1$Filename <- included_subjects
 
-for (mysub in 39:length(included_subjects)){    
+for (mysub in 1:length(included_subjects)){    
   mysubname <- included_subjects[mysub]
 
   cat(mysubname, "\n\n")
+  results1
   
   for (session in 1:2){
     
