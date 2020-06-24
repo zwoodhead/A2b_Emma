@@ -372,12 +372,13 @@ Behavioural task data includes responses the participants made during the task, 
 The following chunk reports summary statistics for these behavioural measures and tests whether there are any behavioural differences between left and right handers. (Spoiler alert: there aren't.)
 
 ```{r behaviouraldata}
-osf_retrieve_file('https://osf.io/wznbv') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data.csv
+osf_retrieve_file('https://osf.io/wznbv') %>% osf_download(conflicts = 'overwrite') # A2_Behavioural_Data.csv
 behavdat_A2    <- read.csv('A2_Behavioural_Data.csv')
-osf_retrieve_file('https://osf.io/mzgan') %>% osf_download(conflicts = 'skip') # A2_Behavioural_Data_Bangor.csv
+osf_retrieve_file('https://osf.io/mzgan') %>% osf_download(conflicts = 'overwrite') # A2_Behavioural_Data_Bangor.csv
 behavdat_Bangor    <- read.csv('A2_Behavioural_Data_Bangor.csv')
 
 colnames(behavdat_A2)[1] <- 'ID'
+colnames(behavdat_Bangor)[1] <- 'ID'
 behavdat <- rbind(behavdat_A2,behavdat_Bangor)
 
 # Only include participants in particdat
@@ -505,7 +506,7 @@ The following chunk reports summary statistics and produces a plot of the LI val
 
 ```{r LI_means, warning=FALSE}
 # Check / download script for ggpirate plot
-osf_retrieve_file('https://osf.io/26w9g/') %>% osf_download(conflicts = 'skip') # Downloads geom_pirate_ZW.R
+osf_retrieve_file('https://osf.io/26w9g/') %>% osf_download(conflicts = 'overwite') # Downloads geom_pirate_ZW.R
 source('geom_pirate_ZW_local.R')
 
 # Create data frame for Shapiro Wilks test results
