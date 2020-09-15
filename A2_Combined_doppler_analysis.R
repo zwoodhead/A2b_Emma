@@ -11,8 +11,6 @@ require(readxl) # xlsx did not work on Macs - you may need to install java first
 require(tidyverse)
 require(osfr)
 
-
-
 ########################################################
 # Download and unzip the data zip files. 
 # NB: it will not overwrite existing files
@@ -90,9 +88,9 @@ resultsloc1 <- "Results_Combined_Session1.csv" # File name for Results from sess
 resultsloc2 <- "Results_Combined_Session2.csv" # File name for Results from session 1
 osf_retrieve_file("https://osf.io/zuj6x") %>% osf_download(conflicts = "skip")
 mycolumns<- read.csv("col_names.txt", header=FALSE)
-results2 <- results1 <- as.data.frame(matrix(data=NA, nrow=nsubj, ncol=91))
-colnames(results1) <- mycolumns[1:91, ]
-colnames(results2) <- mycolumns[92:182, ]
+results2 <- results1 <- as.data.frame(matrix(data=NA, nrow=nsubj, ncol=97))
+colnames(results1) <- mycolumns[1:97, ]
+colnames(results2) <- mycolumns[98:194, ]
 
 results2$Filename <- results1$Filename <- included_subjects
 
@@ -100,7 +98,6 @@ for (mysub in 1:length(included_subjects)){
   mysubname <- included_subjects[mysub]
 
   cat(mysubname, "\n\n")
-  results1
   
   for (session in 1:2){
     
@@ -208,14 +205,6 @@ for (mysub in 1:length(included_subjects)){
       }
     } else {
       markerlist<-origmarkerlist
-    }
-    
-    if (session == 1){
-    results1[mysub,(t-1)*15+3]=length(origmarkerlist) #adds number of original markers 
-    #(i.e. including any practice markers) to table that will be saved at the end
-    }
-    if (session == 2){
-      results2[mysub,(t-1)*15+3]=length(origmarkerlist)
     }
     
     #---------------------------------------------------------
@@ -362,12 +351,8 @@ for (mysub in 1:length(included_subjects)){
     # Remove deleted epochs (originals in origdata; 
     # myepoched updated so only has retained epochs)
     #--------------------------------------------------------
-    if (session == 1){
-    results1[mysub,(t-1)*15+4]=length(badpoints) # add number of spiking/dropout points to table for saving
-    }
-    if (session == 2){
-      results2[mysub,(t-1)*15+4]=length(badpoints) # add number of spiking/dropout points to table for saving
-    }
+    nspikes=length(badpoints) # add number of spiking/dropout points to table for saving
+   
     keepmarkers=which(myinclude==1)
     origdata=myepoched #keep this so can reconstruct
     myepoched=myepoched[keepmarkers,,,] #file with only accepted epochs
@@ -513,34 +498,63 @@ for (mysub in 1:length(included_subjects)){
     }
     acceptableepochs=which(keepepoch==1)
     
-    if (session == 1){
-    results1[mysub,(t-1)*15+5]=length(allextreme) #report number of extreme values across trials
-    }
-    if (session == 2){
-      results2[mysub,(t-1)*15+5]=length(allextreme) #report number of extreme values across trials
-    }
+    nextreme=length(allextreme) #report number of extreme values across trials
     
     #--------------------------------------------------------
-    # Get grand average and summary stats. 
-    # Plot overall laterality curve.
+    # Get grand average
     #--------------------------------------------------------
     finalepochs=myepoched[acceptableepochs,,,4]
-    
     myN=dim(finalepochs)[1] #initialise vectors for laterality stats
-    myLI=1
-    mylatency=1
-    myse=1
-    lowCI=1
-    hiCI=1
-    lateralised=1
-    myLIodd=1
-    myLIeven=1
-    myLI_mean=1
-    myse_mean=1
-
+    
+    # Average over all included trials
     Lmean <- apply(finalepochs[,,1], c(2), mean)
     Rmean <- apply(finalepochs[,,2], c(2), mean)
     LRdiff=Lmean-Rmean
+    
+    # Specify period of interest (POI)
+    baseoffset=-premarker*samplingrate
+    rangestart=baseoffset+poistartpoints
+    rangeend=baseoffset+poiendpoints
+
+    #--------------------------------------------------------
+    # Calculate peak LI stats
+    #--------------------------------------------------------    
+    # Identify peak 
+    mymax=max(LRdiff[rangestart:rangeend])
+    mymin=min(LRdiff[rangestart:rangeend])
+    myside=1
+    mylatpeak=mymax
+    if(-mymin>mymax)
+    {myside=-1 #R biased LI
+    mylatpeak=mymin
+    } #R peak > L peak
+    
+    mytimepeak=first(which(LRdiff==mylatpeak))
+    peak_latency=(mytimepeak-baseoffset)/samplingrate #need to subtract points for baseline
+    mypeakrange=seq(mytimepeak-25,mytimepeak+25) #actual points ie includes baseline
+    
+    # Calculate peak LI
+    peak_LI=round(mean(LRdiff[mypeakrange]),3)
+    
+    # Extract trial-by-trial data for peak SE
+    indLI=numeric(0) #initialise null vector
+    indLI_mean=numeric(0)
+    for (m in 1:myN)
+    {indLI=c(indLI,mean(finalepochs[m,mypeakrange,1]-finalepochs[m,mypeakrange,2]))
+    inddiff <- finalepochs[m,rangestart:rangeend,1] - finalepochs[m,rangestart:rangeend,2]
+    indLI_mean =c(indLI_mean,mean(inddiff)) ## This is now correct!!!
+    }
+    peak_sd <- sd(indLI)
+    peak_se <- round(peak_sd/sqrt(myN), 3)
+    
+    # Calculate whether laterality is significantly left, right or neither (bilateral)
+    latdir=c("R","bilat","L")
+    lowCI=as.numeric(format(peak_LI-myside*peak_se*1.96,digits=3))
+    lateralised=myside
+    if((myside*lowCI)<0) {lateralised=0}
+    peak_laterality=latdir[lateralised+2]
+    
+    # Calculate peak LI from odd or even trials only
     odds<-seq(from=1,to=myN,by=2)
     evens<-seq(from=2,to=myN,by=2)
     Lmeanodd<-apply(finalepochs[odds,,1],c(2),mean)
@@ -549,53 +563,33 @@ for (mysub in 1:length(included_subjects)){
     Rmeaneven<-apply(finalepochs[evens,,2],c(2),mean)
     LRdiffodd<-Lmeanodd-Rmeanodd
     LRdiffeven<-Lmeaneven-Rmeaneven
+    peak_odd <- round(mean(LRdiffodd[mypeakrange]), 3)
+    peak_even <- round(mean(LRdiffeven[mypeakrange]), 3) #NB LI for even and odd computed at same peak as full LI
     
-    #Compute LI etc
-    baseoffset=-premarker*samplingrate
-    rangestart=baseoffset+poistartpoints
-    rangeend=baseoffset+poiendpoints
-    mymax=max(LRdiff[rangestart:rangeend])
-    mymin=min(LRdiff[rangestart:rangeend])
-    myside=1;mylatpeak=mymax
-    if(-mymin>mymax)
-    {myside=-1 #R biased LI
-    mylatpeak=mymin
-    } #R peak > L peak
-    mytimepeak=first(which(LRdiff==mylatpeak))
-    mylatency=(mytimepeak-baseoffset)/samplingrate #need to subtract points for baseline
-    mypeakrange=seq(mytimepeak-25,mytimepeak+25) #actual points ie includes baseline
-    myLI=as.numeric(format(mean(LRdiff[mypeakrange]),digits=3))
-    myLIeven=mean(LRdiffeven[mypeakrange]) #NB LI for even and odd computed at same peak as full LI
-    myLIodd=mean(LRdiffodd[mypeakrange])
-    
-    # Extract trial-by-trial data for SE
-    indLI=numeric(0)#initialise null vector
-    indLI_mean=numeric(0)
-    for (m in 1:myN)
-    {indLI=c(indLI,mean(finalepochs[m,mypeakrange,1]-finalepochs[m,mypeakrange,2]))
-    inddiff <- finalepochs[m,rangestart:rangeend,1] - finalepochs[m,rangestart:rangeend,2]
-    indLI_mean =c(indLI_mean,mean(inddiff)) ## This is now correct!!!
-    }
-    
-    # SE for peak LI
-    mysd <- sd(indLI)
-    myse <- as.numeric(format(mysd/sqrt(myN),digits=3))
+    #--------------------------------------------------------
+    # Calculate mean LI stats
+    #--------------------------------------------------------  
+    # Calculate mean LI
+    mean_LI <- round(mean(LRdiff[rangestart:rangeend]), 3)
     
     # SE for mean LI
-    mysd_mean <- sd(indLI_mean)
-    myse_mean <- as.numeric(format(mysd_mean/sqrt(myN), digits=3))
+    mean_sd <- sd(indLI_mean)
+    mean_se <- round(mean_sd/sqrt(myN), 3)
     
-    # Calculate mean LI
-    myLI_mean <- mean(LRdiff[rangestart:rangeend])
-    
-    # Other stats
-    lowCI=as.numeric(format(myLI-myside*myse*1.96,digits=3))
-    hiCI=as.numeric(format(myLI+myside*myse*1.96,digits=3))
+    # Calculate whether laterality is signficantly left, right or neither (bilateral)
+    myside=1
+    if(mean_LI < 0)
+    {myside=-1} #R biased LI
+    lowCI=as.numeric(format(mean_LI-myside*mean_se*1.96,digits=3))
     lateralised=myside
     if((myside*lowCI)<0) {lateralised=0}
-    latdir=c("R","bilat","L")
-    mylatdir=latdir[lateralised+2]
+    mean_laterality=latdir[lateralised+2]
     
+    # Calculate mean LI from odd or even trials only
+    mean_odd=round(mean(LRdiffodd[rangestart:rangeend]), 3)
+    mean_even=round(mean(LRdiffeven[rangestart:rangeend]), 3)
+    
+
     #----------------------------------------------------------
     #Plot and save overall  laterality curve
     #----------------------------------------------------------
@@ -641,25 +635,29 @@ for (mysub in 1:length(included_subjects)){
     # Writes data to file.
     #------------------------------------------------------
     
+    savedata <- c(norigmarkers, nspikes, nextreme, myN,
+                  peak_LI, peak_latency, peak_se, peak_laterality, peak_odd, peak_even,
+                  mean_LI, mean_se, mean_laterality, mean_odd, mean_even)
+    
     #Prepare stats for individual condition for saving to file
-    startcol <- (t-1)*15+6
-    endcol <- (t-1)*15+16
+    startcol <- (t-1)*16+3
+    endcol <- (t-1)*16+17
     
     if (session == 1){
-    results1[mysub,startcol:endcol]=c(myN,myLI,myse,mylatency,lowCI,hiCI,lateralised,myLIodd,myLIeven,myLI_mean, myse_mean)
-    results1[mysub, (startcol-4)] <- mycomment
+      results1[mysub,startcol-1]      <- mycomment
+      results1[mysub,startcol:endcol] <-  savedata
     }
     if (session == 2){
-      results2[mysub,startcol:endcol]=c(myN,myLI,myse,mylatency,lowCI,hiCI,lateralised,myLIodd,myLIeven,myLI_mean, myse_mean)
-      results2[mysub, (startcol-4)] <- mycomment
+      results2[mysub,startcol-1]      <- mycomment
+      results2[mysub,startcol:endcol] <-  savedata
     }
     
+    # Print averaged epoch data to file
     averageddata <- data.frame("Sent_L" = Lmean,
                                "Sent_R" = Rmean)
     
-    # # Print averaged epoch data to file
     if(length(keepmarkers)>=8){
-      mymeanLR<-data.frame(matrix(ncol=5,nrow=mypts)) ###TESTING WAS 801
+      mymeanLR<-data.frame(matrix(ncol=5,nrow=mypts)) 
       mymeanLR[,1]<-as.integer(mysub)
       alltime<-seq(from=premarker, to=postmarker, by=.04)
       mymeanLR[,2]<-alltime

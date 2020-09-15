@@ -1247,7 +1247,7 @@ alltask$bivoutlier <-1
 alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
-#png("Figure6New.png", width=6, height=5, units="in", res=300)
+png("Figure6New.png", width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
 plot(alltask$f1scoreNew,alltask$f2scoreNew, pch=alltask$bivoutlier, col=particdat$handcode, 
      xlab="Factor 1",ylab="Factor 2")
@@ -1261,7 +1261,7 @@ pData<-cbind(alltask,particdat)
 covEllipses(x=pData[,c("f1scoreNew","f2scoreNew")], group=pData$handcode, 
             pooled=FALSE, add=TRUE, col=c("black","red"), labels="")
 
-#dev.off()
+dev.off()
 ```
 
 
