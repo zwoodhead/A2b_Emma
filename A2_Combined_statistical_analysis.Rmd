@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+#Updated by Paul Thompson - 15th September 2020 based on reviewer comments. 
 ```
 
 ## Introduction
@@ -906,6 +908,11 @@ mychitest_RH
 mychitest_LH <- mxCompare(Model2LH, Model1LH)
 mychitest_LH
 
+#PT edit - sept2020 - added BIC values to satisfy reviewer 3. All other requested information is presetn in mxCompare output.
+umxFitIndices(Model1RH)$informationCriteria
+umxFitIndices(Model2RH)$informationCriteria
+umxFitIndices(Model1RH)$informationCriteria
+umxFitIndices(Model2RH)$informationCriteria
 ```
 
 Conclusion: The two factor model is the winner in both right and left handed groups, but the difference is marginal in right handers.
@@ -1205,10 +1212,28 @@ for (i in 1:length(LH_row)){
 facmod_LH <- lm(alltask$f1score[LH_row] ~ alltask$f2score[LH_row])
 alltask$cookdist[LH_row] <- cooks.distance(facmod_LH)
 
+#=====================================================================#
+Leftfs = umxFactorScores(Model2LH_con, type = 'Regression', minManifests = 0)
+Rightfs = umxFactorScores(Model2RH_con, type = 'Regression', minManifests = 0)
 
-plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = "Cooks Distance", xlab = "Participant")
-w<-which(alltask$cookdist>(4*mean(alltask$cookdist)))
-abline(h=4*mean(alltask$cookdist), lty=2)
+alltask$f1scoreNew <- 0
+alltask$f2scoreNew <- 0
+alltask$f1scoreNew[LH_row] <- Leftfs$F1
+alltask$f2scoreNew[LH_row] <- Leftfs$F2
+alltask$f1scoreNew[RH_row] <- Rightfs$F1
+alltask$f2scoreNew[RH_row] <- Rightfs$F2
+
+
+alltask$cookdistNew <- 0
+facmod_LH <- lm(alltask$f1scoreNew[LH_row] ~ alltask$f2scoreNew[LH_row])
+facmod_RH <- lm(alltask$f1scoreNew[RH_row] ~ alltask$f2scoreNew[RH_row])
+alltask$cookdistNew[LH_row] <- cooks.distance(facmod_LH)
+alltask$cookdistNew[RH_row] <- cooks.distance(facmod_RH)
+#=====================================================================#
+
+plot(alltask$cookdistNew, col=particdat$handcode, pch=16, ylab = "Cooks Distance", xlab = "Participant")
+w<-which(alltask$cookdistNew>(4*mean(alltask$cookdistNew)))
+abline(h=4*mean(alltask$cookdistNew), lty=2)
 abline(v=37.5, lty=2)
 text(x = 10, y = 0.14, labels = "black = right handed\nred = left handed")
 cat("Influential points are:") # These values are ROW NUMBERS not PARTICIPANT IDs
@@ -1217,21 +1242,21 @@ alltask$bivoutlier <-1
 alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
-png("Figure6.png", width=6, height=5, units="in", res=300)
+#png("Figure6New.png", width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
-plot(alltask$f1score,alltask$f2score, pch=alltask$bivoutlier, col=particdat$handcode, 
-     xlab="Factor 1",ylab="Factor 2", xlim=c(-30, 30))
+plot(alltask$f1scoreNew,alltask$f2scoreNew, pch=alltask$bivoutlier, col=particdat$handcode, 
+     xlab="Factor 1",ylab="Factor 2")
 abline(v=0,lty=2)
 abline(h=0,lty=2)
-mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use="pairwise.complete.obs"), 3)
-mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use="pairwise.complete.obs"), 3)
+mycor_RH <- round(cor(alltask$f1scoreNew[RH_row], alltask$f2scoreNew[RH_row], use="pairwise.complete.obs"), 3)
+mycor_LH <- round(cor(alltask$f1scoreNew[LH_row], alltask$f2scoreNew[LH_row], use="pairwise.complete.obs"), 3)
 text(-14, 13, paste("Right Handers: r = ",mycor_RH))
 text(-14, 20, paste("Left Handers: r = ",mycor_LH), col="red")
 pData<-cbind(alltask,particdat)
-covEllipses(x=pData[,c("f1score","f2score")], group=pData$handcode, 
+covEllipses(x=pData[,c("f1scoreNew","f2scoreNew")], group=pData$handcode, 
             pooled=FALSE, add=TRUE, col=c("black","red"), labels="")
 
-dev.off()
+#dev.off()
 ```
 
 
