@@ -901,18 +901,22 @@ Model2LH <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
 #=================================================================================#
 # Model comparison
 
-# Right handers
-mychitest_RH <- mxCompare(Model2RH, Model1RH)
-mychitest_RH
 # Left handers
 mychitest_LH <- mxCompare(Model2LH, Model1LH)
 mychitest_LH
+# Right handers
+mychitest_RH <- mxCompare(Model2RH, Model1RH)
+mychitest_RH
 
 #PT edit - sept2020 - added BIC values to satisfy reviewer 3. All other requested information is presetn in mxCompare output.
-umxFitIndices(Model1RH)$informationCriteria
-umxFitIndices(Model2RH)$informationCriteria
-umxFitIndices(Model1RH)$informationCriteria
-umxFitIndices(Model2RH)$informationCriteria
+myBIC <- vector(length = 4)
+myBIC[1] <- umxFitIndices(Model1LH)$informationCriteria$deviance[2,1]
+myBIC[2] <- umxFitIndices(Model2LH)$informationCriteria$deviance[2,1]
+myBIC[3] <- umxFitIndices(Model1RH)$informationCriteria$deviance[2,1]
+myBIC[4] <- umxFitIndices(Model2RH)$informationCriteria$deviance[2,1]
+cat('BIC values for Table 4: \n')
+cat(myBIC)
+
 ```
 
 Conclusion: The two factor model is the winner in both right and left handed groups, but the difference is marginal in right handers.
@@ -1001,7 +1005,7 @@ Two factor multigroup models, comparing constrained and unconstrained models
 #=================================================================================#
 # Constrained multigroup model where factor loadings are set to be the same in the two groups
 Model2_unc_mg <- umxSuperModel("Model2_unconstrained", Model2RH, Model2LH)
-
+summary(Model2_unc_mg)
 #=================================================================================#
 # Constrained multigroup model where factor loadings are set to be the same in the two groups
 
@@ -1038,6 +1042,7 @@ Model2LH_con <- umxRAM("Model12H", data=dataRaw_LH, suffix = "_LH",
                    umxPath(means=c("F1","F2"),fixedAt = 0))
 
 Model2_con_mg <- umxSuperModel("Model2_constrained", Model2RH_con, Model2LH_con)
+summary(Model2_con_mg)
 
 #=================================================================================#
 # Comparison of unconstrained and constrained multigroup models
