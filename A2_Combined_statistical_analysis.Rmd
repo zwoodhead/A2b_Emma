@@ -117,8 +117,8 @@ data1 <- data1[which(data1$Filename %in% particdat$ID), ]
 data2 <- data2[which(data2$Filename %in% particdat$ID), ] 
 
 # Combine all LI data
-alltask <- cbind(dplyr::select(data1, A1.LI_mean, B1.LI_mean, C1.LI_mean, D1.LI_mean, E1.LI_mean, F1.LI_mean),
-                 dplyr::select(data2, A2.LI_mean, B2.LI_mean, C2.LI_mean, D2.LI_mean, E2.LI_mean, F2.LI_mean))
+alltask <- cbind(dplyr::select(data1, A1.mean_LI, B1.mean_LI, C1.mean_LI, D1.mean_LI, E1.mean_LI, F1.mean_LI),
+                 dplyr::select(data2, A2.mean_LI, B2.mean_LI, C2.mean_LI, D2.mean_LI, E2.mean_LI, F2.mean_LI))
 
 allN <- cbind(dplyr::select(data1, A1.N, B1.N, C1.N, D1.N, E1.N, F1.N),
               dplyr::select(data2, A2.N, B2.N, C2.N, D2.N, E2.N, F2.N))
@@ -709,8 +709,44 @@ if (sig_count > 0){cat("\nCheck LI_retest for details")}
 ```
 
 
-## LI correlation matrix
+## LI Split-half reliablity
 
+This chunk calculates the split-half reliability using odd and even trials
+
+```{r LI-splithalf}
+# Select odd and even data
+allodd <- cbind(dplyr::select(data1, A1.mean_odd, B1.mean_odd, C1.mean_odd, D1.mean_odd, E1.mean_odd, F1.mean_odd),
+                dplyr::select(data2, A2.mean_odd, B2.mean_odd, C2.mean_odd, D2.mean_odd, E2.mean_odd, F2.mean_odd))
+alleven <- cbind(dplyr::select(data1, A1.mean_even, B1.mean_even, C1.mean_even, D1.mean_even, E1.mean_even, F1.mean_even),
+                 dplyr::select(data2, A2.mean_even, B2.mean_even, C2.mean_even, D2.mean_even, E2.mean_even, F2.mean_even))
+
+# Test-retest comparisons of LI values
+LI_splithalf <- data.frame(matrix(NA, nrow=24, ncol=5))
+colnames(LI_splithalf)<-c("Hand", "Task", "Session", "r", "p")
+LI_splithalf$Hand <- rep(c(1,2),each=12)
+LI_splithalf$Session <- rep(c(1,2), each=6, 2)
+LI_splithalf$Task <- rep(myshortlab, 4)
+
+myrow <- 0
+# Loop through groups
+for (h in 1:2) {
+  handedness_rows <- which(particdat$handcode == h)
+  # Loop through column
+  for (mycol in 1:12){
+    myrow <- myrow+1
+    # Calculate correlation
+    my_test <- cor.test(allodd[handedness_rows, mycol],    # Odd trials
+                      alleven[handedness_rows, mycol])  # Even trials
+    # Organise output
+    LI_splithalf$r[myrow] <- round(my_test$estimate, 2)
+    LI_splithalf$p[myrow] <- round(my_test$p.value, 3)
+  }
+}
+
+```
+
+
+## LI correlation matrix
 
 ```{r corrheat,fig.height=6,figwidth=10}
 
