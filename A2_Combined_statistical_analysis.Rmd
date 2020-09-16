@@ -672,6 +672,60 @@ ggsave(filename = "Figure2.png", plot = my_pirate, width = 8, height = 4)
 # Holy moly that was a lot of work for one plot
 ```
 
+## Oxford vs Bangor pirate plot
+
+This chunk creates a pirate plot similar to the one above, but where the point shape indicates whether participants are from Oxford vs Bangor.
+
+```{r Oxford_Bangor}
+# Collate LI data for pirate plot
+ID_data <- data.frame(
+  ID = as.factor(particdat$ID),
+  Hand = as.factor(particdat$handedness),
+  Site = as.factor(particdat$study))
+
+pirate_data <- cbind(ID_data, alltaskall)
+
+LI_long <- melt(pirate_data, value.name = "LI") #version with outliers 
+LI_long$Session <- as.factor(c(rep(1, nsubj_final*6), rep(2, nsubj_final*6)))
+LI_long$Task <- rep(rep(myshortlab, each=nsubj_final), 2)
+LI_long$Taskcode <- rep(rep(c("A","B","C","D","E","F"), each = nsubj_final), 2)
+levels(LI_long$Hand) <- c("Left Handed","Right Handed")
+
+
+# Make pirate plot
+my_pirate = ggplot(data = LI_long,
+                   mapping = aes(x = Taskcode,
+                                 y = LI,
+                                 colour = Site)) +
+ geom_pirate_ZW(points_params = list(alpha = 0),
+                 bars = FALSE,
+                 #bars_params = list(colour = "black"),
+                 #violins_params = list(width = 3),
+                 #cis_params = list(width = 3),
+                 #lines_params = list(width = 3),
+                 jitter_width = 0.4, show.legend=TRUE) +
+  labs(y = "LI Value", x = "Task") +
+  scale_y_continuous(breaks = seq(from = -6, to = 7, by = 1)) +
+  theme_bw() +
+  theme(legend.position = "right", panel.grid.minor = element_blank(), panel.grid.major.x = element_blank()) +
+  geom_hline(yintercept = 0) +
+  facet_grid(Session~Hand) +
+  # Coded points for laterality categories
+  geom_point(data = LI_long, aes(x = Taskcode, colour = Site, y = LI),
+             position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.7),
+             size = 1.2, alpha = 0.5, na.rm = TRUE) +
+  scale_colour_manual(values = c(1, 2), 
+                     name = "Testing Site", labels = c("Oxford", "Bangor"))
+
+print(my_pirate)
+
+ggsave(filename = "Supplementary_Figure2.png", plot = my_pirate, width = 8, height = 6)
+
+
+
+```
+
+
 
 ## LI Test-rest reliablity
 
