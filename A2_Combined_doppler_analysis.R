@@ -678,7 +678,7 @@ write.csv(results1, file = resultsloc1, row.names=F)
 write.csv(results2, file = resultsloc2, row.names=F)
 
 # Tidy up
-if(file.exists("Bangor_data.zip")){file.remove("Bangor_data.zip")}
-if(file.exists("Oxford_data.zip")){file.remove("Oxford_data.zip")}
+if(file.exists("A2_Bangor_fTCD_data.zip")){file.remove("A2_Bangor_fTCD_data.zip")}
+if(file.exists("A2_Oxford_fTCD_data.zip")){file.remove("A2_Oxford_fTCD_data.zip")}
   
   
