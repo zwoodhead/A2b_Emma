@@ -1239,7 +1239,7 @@ allf2_RH <- c(0, real_est_path[6:10]) # Factor 2, RH
 # Multiply LI values by factor loading and sum to give factor scores for each individual
 for (i in 1:length(RH_row)){
   # Factor 1
-  alltask$f1score[RH_row[i]] <- alltaskall[RH_row[i],1] * allf1_RH[1] + 
+  alltask$f1score[RH_row[i]] <- (alltaskall[RH_row[i],1] * allf1_RH[1] + 
                         alltaskall[RH_row[i],2] * allf1_RH[2] +
                         alltaskall[RH_row[i],3] * allf1_RH[3]+
                         alltaskall[RH_row[i],4] * allf1_RH[4]+
@@ -1250,9 +1250,9 @@ for (i in 1:length(RH_row)){
                         alltaskall[RH_row[i],9] * allf1_RH[3]+
                         alltaskall[RH_row[i],10] * allf1_RH[4]+
                         alltaskall[RH_row[i],11] * allf1_RH[5]+
-                        alltaskall[RH_row[i],12] * allf1_RH[6]
+                        alltaskall[RH_row[i],12] * allf1_RH[6]) / 12
   # Factor 2
-  alltask$f2score[RH_row[i]] <- alltaskall[RH_row[i],1] * allf2_RH[1]+
+  alltask$f2score[RH_row[i]] <- (alltaskall[RH_row[i],1] * allf2_RH[1]+
                         alltaskall[RH_row[i],2] * allf2_RH[2]+
                         alltaskall[RH_row[i],3] * allf2_RH[3]+
                         alltaskall[RH_row[i],4] * allf2_RH[4]+
@@ -1263,7 +1263,7 @@ for (i in 1:length(RH_row)){
                         alltaskall[RH_row[i],9] * allf2_RH[3]+
                         alltaskall[RH_row[i],10] * allf2_RH[4]+
                         alltaskall[RH_row[i],11] * allf2_RH[5]+
-                        alltaskall[RH_row[i],12] * allf2_RH[6]
+                        alltaskall[RH_row[i],12] * allf2_RH[6]) / 12
 }
 #check for bivariate outliers
 facmod_RH <- lm(alltask$f1score[RH_row] ~ alltask$f2score[RH_row])
@@ -1277,7 +1277,7 @@ allf2_LH <- c(0, real_est_path[29:33]) # Factor 2, LH
 
 for (i in 1:length(LH_row)){
   # Factor 1
-  alltask$f1score[LH_row[i]] <- alltaskall[LH_row[i],1] * allf1_LH[1] + 
+  alltask$f1score[LH_row[i]] <- (alltaskall[LH_row[i],1] * allf1_LH[1] + 
                         alltaskall[LH_row[i],2] * allf1_LH[2] +
                         alltaskall[LH_row[i],3] * allf1_LH[3]+
                         alltaskall[LH_row[i],4] * allf1_LH[4]+
@@ -1288,9 +1288,9 @@ for (i in 1:length(LH_row)){
                         alltaskall[LH_row[i],9] * allf1_LH[3]+
                         alltaskall[LH_row[i],10] * allf1_LH[4]+
                         alltaskall[LH_row[i],11] * allf1_LH[5]+
-                        alltaskall[LH_row[i],12] * allf1_LH[6]
+                        alltaskall[LH_row[i],12] * allf1_LH[6]) / 12
   # Factor 2
-  alltask$f2score[LH_row[i]] <- alltaskall[LH_row[i],1] * allf2_LH[1]+
+  alltask$f2score[LH_row[i]] <- (alltaskall[LH_row[i],1] * allf2_LH[1]+
                         alltaskall[LH_row[i],2] * allf2_LH[2]+
                         alltaskall[LH_row[i],3] * allf2_LH[3]+
                         alltaskall[LH_row[i],4] * allf2_LH[4]+
@@ -1301,34 +1301,16 @@ for (i in 1:length(LH_row)){
                         alltaskall[LH_row[i],9] * allf2_LH[3]+
                         alltaskall[LH_row[i],10] * allf2_LH[4]+
                         alltaskall[LH_row[i],11] * allf2_LH[5]+
-                        alltaskall[LH_row[i],12] * allf2_LH[6]
+                        alltaskall[LH_row[i],12] * allf2_LH[6]) / 12
 }
 #check for bivariate outliers
 facmod_LH <- lm(alltask$f1score[LH_row] ~ alltask$f2score[LH_row])
 alltask$cookdist[LH_row] <- cooks.distance(facmod_LH)
 
-#=====================================================================#
-Leftfs = umxFactorScores(Model2LH_con, type = 'Regression', minManifests = 0)
-Rightfs = umxFactorScores(Model2RH_con, type = 'Regression', minManifests = 0)
-
-alltask$f1scoreNew <- 0
-alltask$f2scoreNew <- 0
-alltask$f1scoreNew[LH_row] <- Leftfs$F1
-alltask$f2scoreNew[LH_row] <- Leftfs$F2
-alltask$f1scoreNew[RH_row] <- Rightfs$F1
-alltask$f2scoreNew[RH_row] <- Rightfs$F2
-
-
-alltask$cookdistNew <- 0
-facmod_LH <- lm(alltask$f1scoreNew[LH_row] ~ alltask$f2scoreNew[LH_row])
-facmod_RH <- lm(alltask$f1scoreNew[RH_row] ~ alltask$f2scoreNew[RH_row])
-alltask$cookdistNew[LH_row] <- cooks.distance(facmod_LH)
-alltask$cookdistNew[RH_row] <- cooks.distance(facmod_RH)
-#=====================================================================#
-
-plot(alltask$cookdistNew, col=particdat$handcode, pch=16, ylab = "Cooks Distance", xlab = "Participant")
-w<-which(alltask$cookdistNew>(4*mean(alltask$cookdistNew)))
-abline(h=4*mean(alltask$cookdistNew), lty=2)
+# Plot cooks distances
+plot(alltask$cookdist, col=particdat$handcode, pch=16, ylab = "Cooks Distance", xlab = "Participant")
+w<-which(alltask$cookdist>(4*mean(alltask$cookdist)))
+abline(h=4*mean(alltask$cookdist), lty=2)
 abline(v=37.5, lty=2)
 text(x = 10, y = 0.14, labels = "black = right handed\nred = left handed")
 cat("Influential points are:") # These values are ROW NUMBERS not PARTICIPANT IDs
@@ -1337,18 +1319,18 @@ alltask$bivoutlier <-1
 alltask$bivoutlier[w] <-16
 
 # Make My_facscores.png plot, showing outliers and left-handers
-png("Figure6New.png", width=6, height=5, units="in", res=300)
+png("Figure6.png", width=6, height=5, units="in", res=300)
 par(mar = c(4.5, 4.1, 1, 1))
-plot(alltask$f1scoreNew,alltask$f2scoreNew, pch=alltask$bivoutlier, col=particdat$handcode, 
+plot(alltask$f1score,alltask$f2score, pch=alltask$bivoutlier, col=particdat$handcode, 
      xlab="Factor 1",ylab="Factor 2")
 abline(v=0,lty=2)
 abline(h=0,lty=2)
-mycor_RH <- round(cor(alltask$f1scoreNew[RH_row], alltask$f2scoreNew[RH_row], use="pairwise.complete.obs"), 3)
-mycor_LH <- round(cor(alltask$f1scoreNew[LH_row], alltask$f2scoreNew[LH_row], use="pairwise.complete.obs"), 3)
-text(-14, 13, paste("Right Handers: r = ",mycor_RH))
-text(-14, 20, paste("Left Handers: r = ",mycor_LH), col="red")
+mycor_RH <- round(cor(alltask$f1score[RH_row], alltask$f2score[RH_row], use="pairwise.complete.obs"), 3)
+mycor_LH <- round(cor(alltask$f1score[LH_row], alltask$f2score[LH_row], use="pairwise.complete.obs"), 3)
+text(-0.9, 1.5, paste("Right Handers: r = ",mycor_RH))
+text(-0.9, 2, paste("Left Handers: r = ",mycor_LH), col="red")
 pData<-cbind(alltask,particdat)
-covEllipses(x=pData[,c("f1scoreNew","f2scoreNew")], group=pData$handcode, 
+covEllipses(x=pData[,c("f1score","f2score")], group=pData$handcode, 
             pooled=FALSE, add=TRUE, col=c("black","red"), labels="")
 
 dev.off()
